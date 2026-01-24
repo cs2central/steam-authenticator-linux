@@ -341,7 +341,7 @@ class SetupDialog(Adw.Window):
             return
 
         if result.get("needs_2fa"):
-            self.show_error("This account already has Steam Guard enabled.\n\nTo use this account, you need to:\n1. Disable Steam Guard in your current authenticator\n2. Or use 'Import Account' if you have the .maFile")
+            self.show_error("This account already has Steam Guard enabled.\n\nTo use this account, you need to:\n1. Disable Steam Guard in your Steam account settings\n2. Or use 'Import Account' if you have the .maFile")
             self.stack.set_visible_child_name("login")
             return
 
@@ -402,7 +402,7 @@ class SetupDialog(Adw.Window):
         if result.get("error"):
             error = result.get("error")
             if error == "authenticator_present":
-                self.show_error("This account already has Steam Guard enabled.\n\nTo use this account, you need to:\n1. Disable Steam Guard in your current authenticator\n2. Or use 'Import Account' if you have the .maFile")
+                self.show_error("This account already has Steam Guard enabled.\n\nTo use this account, you need to:\n1. Disable Steam Guard in your Steam account settings\n2. Or use 'Import Account' if you have the .maFile")
             elif error == "no_phone":
                 self.show_error("Your Steam account needs a phone number.\n\nPlease add a phone number to your Steam account first, then try again.")
             elif error == "confirm_email":
