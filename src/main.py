@@ -17,6 +17,7 @@ from ui import MainWindow
 from mafile_manager import MaFileManager
 from login_dialog import LoginDialog
 from preferences import PreferencesManager, PreferencesWindow
+from setup_dialog import SetupDialog
 
 # Set up logging
 logging.basicConfig(
@@ -49,6 +50,7 @@ class SteamAuthenticatorApp(Adw.Application):
         self.create_action('about', self.on_about_action)
         self.create_action('preferences', self.on_preferences_action)
         self.create_action('add_account', self.on_add_account_action)
+        self.create_action('setup_account', self.on_setup_account_action)
         self.create_action('remove_account', self.on_remove_account_action)
         self.create_action('import_account', self.on_import_account_action)
         self.create_action('import_folder', self.on_import_folder_action)
@@ -150,7 +152,34 @@ class SteamAuthenticatorApp(Adw.Application):
         # Show add account dialog
         if self.main_window:
             self.main_window.show_add_account_dialog()
-    
+
+    def on_setup_account_action(self, action, param):
+        """Show setup dialog to link a new Steam account"""
+        if self.main_window:
+            dialog = SetupDialog(parent=self.main_window)
+            dialog.connect('account-created', self.on_account_setup_complete)
+            dialog.present()
+
+    def on_account_setup_complete(self, dialog, account_data):
+        """Handle successful account setup"""
+        try:
+            account = SteamGuardAccount(account_data)
+            self.mafile_manager.save_mafile(account)
+
+            # Reload accounts
+            self.load_accounts()
+            self.main_window.set_accounts(self.accounts)
+
+            # Select the new account
+            self.current_account = account
+            self.main_window.set_current_account(account)
+
+            self.main_window.show_toast(f"Account {account.account_name} set up successfully!")
+            logging.info(f"New account linked: {account.account_name}")
+        except Exception as e:
+            logging.error(f"Error saving new account: {e}")
+            self.main_window.show_toast("Could not save account. Please try again.")
+
     def on_remove_account_action(self, action, param):
         if self.current_account and self.main_window:
             dialog = Adw.MessageDialog(
