@@ -1,0 +1,78 @@
+app-id: gg.cs2central.SteamAuthenticator
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: steam-authenticator
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --talk-name=org.freedesktop.secrets
+  - --filesystem=home
+
+modules:
+  - name: python3-aiohttp
+    buildsystem: simple
+    build-commands:
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+        --prefix=${FLATPAK_DEST} aiohttp
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/py3/a/aiohttp/aiohttp-3.9.0-py3-none-any.whl
+        sha256: placeholder
+
+  - name: python3-cryptography
+    buildsystem: simple
+    build-commands:
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+        --prefix=${FLATPAK_DEST} cryptography
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/cryptography/cryptography-41.0.0.tar.gz
+        sha256: placeholder
+
+  - name: python3-qrcode
+    buildsystem: simple
+    build-commands:
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+        --prefix=${FLATPAK_DEST} qrcode pillow
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/qrcode/qrcode-7.4.0.tar.gz
+        sha256: placeholder
+
+  - name: python3-requests
+    buildsystem: simple
+    build-commands:
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+        --prefix=${FLATPAK_DEST} requests
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/requests/requests-2.31.0.tar.gz
+        sha256: placeholder
+
+  - name: python3-argon2-cffi
+    buildsystem: simple
+    build-commands:
+      - pip3 install --verbose --exists-action=i --no-index --find-links="file://${PWD}"
+        --prefix=${FLATPAK_DEST} argon2-cffi
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/argon2-cffi/argon2-cffi-23.1.0.tar.gz
+        sha256: placeholder
+
+  - name: steam-authenticator
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 run.sh ${FLATPAK_DEST}/bin/steam-authenticator
+      - mkdir -p ${FLATPAK_DEST}/share/steam-authenticator
+      - cp -r src/* ${FLATPAK_DEST}/share/steam-authenticator/
+      - install -Dm644 packaging/flatpak/gg.cs2central.SteamAuthenticator.desktop ${FLATPAK_DEST}/share/applications/gg.cs2central.SteamAuthenticator.desktop
+      - install -Dm644 packaging/flatpak/gg.cs2central.SteamAuthenticator.metainfo.xml ${FLATPAK_DEST}/share/metainfo/gg.cs2central.SteamAuthenticator.metainfo.xml
+      - install -Dm644 assets/icon.png ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/gg.cs2central.SteamAuthenticator.png
+    sources:
+      - type: dir
+        path: ../..

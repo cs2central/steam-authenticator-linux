@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Create Release Archive
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        mkdir -p release
+        tar -czvf release/steam-authenticator-linux-$VERSION.tar.gz \
+          --exclude='.git' \
+          --exclude='venv' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='*.log' \
+          .
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/*
+        generate_release_notes: true
+        body: |
+          ## Installation
+
+          ### Quick Install
+          ```bash
+          git clone https://github.com/cs2central/steam-authenticator-linux.git
+          cd steam-authenticator-linux
+          ./install.sh
+          ```
+
+          ### Download Archive
+          Download the tar.gz file and extract:
+          ```bash
+          tar -xzvf steam-authenticator-linux-*.tar.gz
+          cd steam-authenticator-linux
+          ./install.sh
+          ```
+
+          ## Links
+          - [Discord](https://discord.gg/cs2central)
+          - [Website](https://cs2central.gg/)

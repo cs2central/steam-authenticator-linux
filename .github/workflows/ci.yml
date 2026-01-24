@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gir1.2-gtk-4.0 gir1.2-adw-1 libgtk-4-1 libadwaita-1-0 \
+          python3-gi python3-gi-cairo python3-pip python3-venv
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Create virtual environment
+      run: python3 -m venv --system-site-packages venv
+
+    - name: Install Python dependencies
+      run: ./venv/bin/pip install -r requirements.txt
+
+    - name: Check syntax
+      run: ./venv/bin/python -m py_compile src/*.py
+
+  test-fedora:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        dnf install -y gtk4 libadwaita python3 python3-gobject python3-pip
+
+    - name: Install Python dependencies
+      run: pip3 install aiohttp cryptography qrcode pillow requests argon2-cffi
+
+    - name: Check syntax
+      run: python3 -m py_compile src/*.py
+
+  test-arch:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm gtk4 libadwaita python python-gobject python-pip
+
+    - name: Install Python dependencies
+      run: pip install aiohttp cryptography qrcode pillow requests argon2-cffi --break-system-packages
+
+    - name: Check syntax
+      run: python -m py_compile src/*.py

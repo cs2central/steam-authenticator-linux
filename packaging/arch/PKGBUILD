@@ -1,0 +1,59 @@
+# Maintainer: zorex <info@cs2central.gg>
+pkgname=steam-authenticator-linux
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="A modern Steam Authenticator for Linux with 2FA code generation and trade confirmation support"
+arch=('any')
+url="https://github.com/cs2central/steam-authenticator-linux"
+license=('GPL3')
+depends=(
+    'python'
+    'python-gobject'
+    'gtk4'
+    'libadwaita'
+    'python-aiohttp'
+    'python-cryptography'
+    'python-qrcode'
+    'python-pillow'
+    'python-requests'
+    'python-argon2-cffi'
+)
+makedepends=('git')
+source=("git+https://github.com/cs2central/steam-authenticator-linux.git")
+sha256sums=('SKIP')
+
+package() {
+    cd "$srcdir/$pkgname"
+
+    # Install application files
+    install -dm755 "$pkgdir/opt/$pkgname"
+    cp -r src/* "$pkgdir/opt/$pkgname/"
+
+    # Install run script
+    install -Dm755 run.sh "$pkgdir/opt/$pkgname/run.sh"
+
+    # Create wrapper script
+    install -dm755 "$pkgdir/usr/bin"
+    cat > "$pkgdir/usr/bin/steam-authenticator" << EOF
+#!/bin/bash
+cd /opt/$pkgname
+exec python3 main.py "\$@"
+EOF
+    chmod 755 "$pkgdir/usr/bin/steam-authenticator"
+
+    # Install desktop file
+    install -Dm644 packaging/flatpak/gg.cs2central.SteamAuthenticator.desktop \
+        "$pkgdir/usr/share/applications/steam-authenticator.desktop"
+
+    # Update desktop file paths
+    sed -i 's|Exec=steam-authenticator|Exec=/usr/bin/steam-authenticator|' \
+        "$pkgdir/usr/share/applications/steam-authenticator.desktop"
+    sed -i 's|Icon=gg.cs2central.SteamAuthenticator|Icon=steam|' \
+        "$pkgdir/usr/share/applications/steam-authenticator.desktop"
+
+    # Install license
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+    # Install documentation
+    install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

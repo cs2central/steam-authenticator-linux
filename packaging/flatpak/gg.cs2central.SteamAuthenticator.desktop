@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Steam Authenticator
+GenericName=Steam 2FA Manager
+Comment=A modern Steam Authenticator for Linux with 2FA code generation and trade confirmation support
+Exec=steam-authenticator
+Icon=gg.cs2central.SteamAuthenticator
+Terminal=false
+Categories=Network;Security;Game;
+StartupNotify=true
+StartupWMClass=steam-authenticator
+Keywords=Steam;2FA;Authenticator;Gaming;Trade;Guard;
