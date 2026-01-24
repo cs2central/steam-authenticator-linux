@@ -198,7 +198,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Discord button
         discord_button = Gtk.Button()
-        discord_button.set_icon_name("discord-symbolic")
+        discord_button.set_icon_name("chat-symbolic")
         discord_button.set_tooltip_text("Join our Discord")
         discord_button.connect("clicked", self.on_discord_clicked)
         header.pack_start(discord_button)
