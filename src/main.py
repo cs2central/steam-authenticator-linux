@@ -141,7 +141,6 @@ class SteamAuthenticatorApp(Adw.Application):
             support_url='https://discord.gg/cs2central'
         )
         about.add_link("Discord", "https://discord.gg/cs2central")
-        about.add_link("Website", "https://cs2central.gg/")
         about.present()
     
     def on_preferences_action(self, action, param):
