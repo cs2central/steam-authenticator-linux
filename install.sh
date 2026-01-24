@@ -48,6 +48,9 @@ install_system_deps() {
             ;;
         arch|manjaro|cachyos|endeavouros|garuda)
             echo -e "${GREEN}Installing dependencies for Arch-based system...${NC}"
+            echo -e "${YELLOW}Updating package database...${NC}"
+            sudo pacman -Sy
+            echo -e "${YELLOW}Installing packages...${NC}"
             sudo pacman -S --noconfirm --needed gtk4 libadwaita python python-gobject python-pip
             ;;
         fedora|rhel|centos|rocky|alma)
@@ -82,6 +85,9 @@ install_system_deps() {
                     ;;
                 *arch*)
                     echo -e "${GREEN}Installing dependencies for Arch-like system...${NC}"
+                    echo -e "${YELLOW}Updating package database...${NC}"
+                    sudo pacman -Sy
+                    echo -e "${YELLOW}Installing packages...${NC}"
                     sudo pacman -S --noconfirm --needed gtk4 libadwaita python python-gobject python-pip
                     ;;
                 *fedora*|*rhel*)
