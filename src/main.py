@@ -140,6 +140,7 @@ class SteamAuthenticatorApp(Adw.Application):
             issue_url='https://github.com/cs2central/steam-authenticator-linux/issues',
             support_url='https://discord.gg/cs2central'
         )
+        about.add_credit_section("Beta Testers", ["SmokeyCS"])
         about.add_link("Discord", "https://discord.gg/cs2central")
         about.present()
     
