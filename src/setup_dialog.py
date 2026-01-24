@@ -108,6 +108,24 @@ class SetupDialog(Adw.Window):
         self.password_row.connect("entry-activated", self.on_login_clicked)
         form_group.add(self.password_row)
 
+        # Error message (hidden by default)
+        self.error_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.error_box.set_margin_top(15)
+        self.error_box.set_margin_bottom(5)
+        self.error_box.set_visible(False)
+
+        self.error_label = Gtk.Label()
+        self.error_label.set_wrap(True)
+        self.error_label.set_justify(Gtk.Justification.CENTER)
+        # Apply red color via CSS
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(b".error-text { color: #e01b24; font-weight: bold; }")
+        self.error_label.get_style_context().add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.error_label.add_css_class("error-text")
+        self.error_box.append(self.error_label)
+
+        page.append(self.error_box)
+
         # Warning
         warning_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         warning_box.set_margin_top(10)
@@ -280,11 +298,14 @@ class SetupDialog(Adw.Window):
 
     def on_login_clicked(self, widget):
         """Handle login button click"""
+        # Hide any previous error
+        self.hide_error()
+
         username = self.username_row.get_text().strip()
         password = self.password_row.get_text()
 
         if not username or not password:
-            self.show_toast("Please enter username and password")
+            self.show_error("Please enter username and password")
             return
 
         self.stack.set_visible_child_name("loading")
@@ -315,19 +336,22 @@ class SetupDialog(Adw.Window):
     def handle_login_result(self, result, username):
         """Handle login result"""
         if result.get("error"):
-            self.show_toast("Could not login. Please check your credentials.")
+            self.show_error("Could not login. Please check your credentials.")
             self.stack.set_visible_child_name("login")
             return
 
         if result.get("needs_2fa"):
-            self.show_toast("Account already has 2FA. Use Import instead.")
+            self.show_error("This account already has Steam Guard enabled.\n\nTo use this account, you need to:\n1. Disable Steam Guard in your current authenticator\n2. Or use 'Import Account' if you have the .maFile")
             self.stack.set_visible_child_name("login")
             return
 
         if not result.get("success"):
-            self.show_toast("Login failed. Please try again.")
+            self.show_error("Login failed. Please try again.")
             self.stack.set_visible_child_name("login")
             return
+
+        # Clear any previous error
+        self.hide_error()
 
         # Store tokens
         self.access_token = result.get("access_token")
@@ -378,13 +402,13 @@ class SetupDialog(Adw.Window):
         if result.get("error"):
             error = result.get("error")
             if error == "authenticator_present":
-                self.show_toast("Account already has an authenticator. Use Import.")
+                self.show_error("This account already has Steam Guard enabled.\n\nTo use this account, you need to:\n1. Disable Steam Guard in your current authenticator\n2. Or use 'Import Account' if you have the .maFile")
             elif error == "no_phone":
-                self.show_toast("Please add a phone number to your Steam account first.")
+                self.show_error("Your Steam account needs a phone number.\n\nPlease add a phone number to your Steam account first, then try again.")
             elif error == "confirm_email":
-                self.show_toast("Please confirm the email from Steam, then try again.")
+                self.show_error("Steam sent you a confirmation email.\n\nPlease click the link in that email, then try again.")
             else:
-                self.show_toast(f"Could not add authenticator. Please try again.")
+                self.show_error("Could not add authenticator. Please try again.")
 
             self.stack.set_visible_child_name("login")
             return
@@ -507,3 +531,13 @@ class SetupDialog(Adw.Window):
         toast = Adw.Toast(title=message)
         toast.set_timeout(3)
         self.toast_overlay.add_toast(toast)
+
+    def show_error(self, message: str):
+        """Show a persistent error message in red"""
+        self.error_label.set_text(message)
+        self.error_box.set_visible(True)
+
+    def hide_error(self):
+        """Hide the error message"""
+        self.error_box.set_visible(False)
+        self.error_label.set_text("")

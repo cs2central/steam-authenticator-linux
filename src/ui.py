@@ -218,7 +218,6 @@ class MainWindow(Adw.ApplicationWindow):
         # Create menu
         menu = Gio.Menu()
         menu.append("Set Up New Account", "app.setup_account")
-        menu.append("Add Account Manually", "app.add_account")
         menu.append("Import Account", "app.import_account")
         menu.append("Import Folder", "app.import_folder")
         menu.append("Export Account", "app.export_account")
