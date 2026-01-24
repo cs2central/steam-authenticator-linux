@@ -2,10 +2,13 @@
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib, Gio, GdkPixbuf
+from gi.repository import Gtk, Adw, GLib, Gio, Gdk, GdkPixbuf
 import asyncio
 import threading
 from pathlib import Path
+
+# Get the icon path
+ICON_PATH = Path(__file__).parent / "icons"
 import json
 import logging
 import time
@@ -44,7 +47,11 @@ class SteamAuthenticatorApp(Adw.Application):
         
     def do_startup(self):
         Adw.Application.do_startup(self)
-        
+
+        # Add custom icon path to icon theme
+        icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        icon_theme.add_search_path(str(ICON_PATH))
+
         # Set up actions
         self.create_action('quit', lambda *_: self.quit(), ['<Control>q'])
         self.create_action('about', self.on_about_action)
@@ -129,7 +136,7 @@ class SteamAuthenticatorApp(Adw.Application):
         about = Adw.AboutWindow(
             transient_for=self.main_window,
             application_name='Steam Authenticator',
-            application_icon='steam',
+            application_icon='steam-authenticator',
             developer_name='zorex',
             version='1.0.0',
             developers=['zorex'],

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <!-- Steam background gradient -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1b2838"/>
+      <stop offset="100%" style="stop-color:#2a475e"/>
+    </linearGradient>
+    <!-- Lock gradient -->
+    <linearGradient id="lockGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#66c0f4"/>
+      <stop offset="100%" style="stop-color:#417a9b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="8" y="8" width="240" height="240" rx="48" ry="48" fill="url(#bgGradient)"/>
+
+  <!-- Lock shackle (thick rounded U shape) -->
+  <path d="M80 115 L80 85
+           C80 55 100 38 128 38
+           C156 38 176 55 176 85
+           L176 115"
+        fill="none"
+        stroke="#66c0f4"
+        stroke-width="24"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Lock body -->
+  <rect x="56" y="108" width="144" height="105" rx="16" ry="16" fill="url(#lockGradient)"/>
+
+  <!-- Keyhole outer circle -->
+  <circle cx="128" cy="150" r="20" fill="#1b2838"/>
+
+  <!-- Keyhole slot -->
+  <rect x="120" y="150" width="16" height="40" rx="4" ry="4" fill="#1b2838"/>
+</svg>

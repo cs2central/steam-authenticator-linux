@@ -125,6 +125,24 @@ install_python_deps() {
     ./venv/bin/pip install aiohttp cryptography "qrcode[pil]" Pillow requests argon2-cffi
 }
 
+# Install application icon
+install_icon() {
+    echo -e "${GREEN}Installing application icon...${NC}"
+
+    # Install PNG icon
+    mkdir -p "$HOME/.local/share/icons/hicolor/256x256/apps"
+    cp "$SCRIPT_DIR/assets/icon.png" "$HOME/.local/share/icons/hicolor/256x256/apps/steam-authenticator.png"
+
+    # Install SVG icon
+    mkdir -p "$HOME/.local/share/icons/hicolor/scalable/apps"
+    cp "$SCRIPT_DIR/assets/icon.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/steam-authenticator.svg"
+
+    # Update icon cache
+    if command -v gtk-update-icon-cache &> /dev/null; then
+        gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+    fi
+}
+
 # Create desktop entry
 create_desktop_entry() {
     echo -e "${GREEN}Creating desktop entry...${NC}"
@@ -139,7 +157,7 @@ Type=Application
 Name=Steam Authenticator
 Comment=A modern Steam Authenticator for Linux with 2FA code generation and trade confirmation support
 Exec="$SCRIPT_DIR/run.sh"
-Icon=steam
+Icon=steam-authenticator
 Path=$SCRIPT_DIR
 Terminal=false
 Categories=Network;Security;Game;
@@ -166,19 +184,23 @@ create_data_dirs() {
 
 # Main installation
 main() {
-    echo -e "${BLUE}Step 1/4: Installing system dependencies...${NC}"
+    echo -e "${BLUE}Step 1/5: Installing system dependencies...${NC}"
     install_system_deps
 
     echo ""
-    echo -e "${BLUE}Step 2/4: Installing Python dependencies...${NC}"
+    echo -e "${BLUE}Step 2/5: Installing Python dependencies...${NC}"
     install_python_deps
 
     echo ""
-    echo -e "${BLUE}Step 3/4: Creating desktop entry...${NC}"
+    echo -e "${BLUE}Step 3/5: Installing application icon...${NC}"
+    install_icon
+
+    echo ""
+    echo -e "${BLUE}Step 4/5: Creating desktop entry...${NC}"
     create_desktop_entry
 
     echo ""
-    echo -e "${BLUE}Step 4/4: Creating data directories...${NC}"
+    echo -e "${BLUE}Step 5/5: Creating data directories...${NC}"
     create_data_dirs
 
     echo ""

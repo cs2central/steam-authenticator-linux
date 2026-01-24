@@ -73,6 +73,7 @@ modules:
       - install -Dm644 packaging/flatpak/gg.cs2central.SteamAuthenticator.desktop ${FLATPAK_DEST}/share/applications/gg.cs2central.SteamAuthenticator.desktop
       - install -Dm644 packaging/flatpak/gg.cs2central.SteamAuthenticator.metainfo.xml ${FLATPAK_DEST}/share/metainfo/gg.cs2central.SteamAuthenticator.metainfo.xml
       - install -Dm644 assets/icon.png ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/gg.cs2central.SteamAuthenticator.png
+      - install -Dm644 assets/icon.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/gg.cs2central.SteamAuthenticator.svg
     sources:
       - type: dir
         path: ../..
