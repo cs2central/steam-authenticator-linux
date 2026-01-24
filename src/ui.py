@@ -6,6 +6,7 @@ import asyncio
 from typing import Optional
 import qrcode
 from io import BytesIO
+from pathlib import Path
 
 from steam_guard import SteamGuardAccount
 from steam_api import SteamAPI
@@ -42,11 +43,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.toast_overlay.set_child(scrolled)
         
         # Content box
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-        content_box.set_margin_top(20)
-        content_box.set_margin_bottom(20)
-        content_box.set_margin_start(20)
-        content_box.set_margin_end(20)
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_top(12)
+        content_box.set_margin_bottom(12)
+        content_box.set_margin_start(16)
+        content_box.set_margin_end(16)
         scrolled.set_child(content_box)
         
         # Account selector
@@ -68,12 +69,12 @@ class MainWindow(Adw.ApplicationWindow):
         content_box.append(code_group)
         
         # Code display card
-        self.code_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.code_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         self.code_card.add_css_class("card")
-        self.code_card.set_margin_top(12)
-        self.code_card.set_margin_bottom(12)
-        self.code_card.set_margin_start(12)
-        self.code_card.set_margin_end(12)
+        self.code_card.set_margin_top(8)
+        self.code_card.set_margin_bottom(8)
+        self.code_card.set_margin_start(8)
+        self.code_card.set_margin_end(8)
         code_group.add(self.code_card)
         
         # Code label
@@ -86,10 +87,10 @@ class MainWindow(Adw.ApplicationWindow):
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b"""
             .title-1 {
-                font-size: 48px;
+                font-size: 36px;
                 font-family: monospace;
                 font-weight: bold;
-                letter-spacing: 8px;
+                letter-spacing: 6px;
                 color: @accent_color;
             }
             .code-small {
@@ -196,9 +197,12 @@ class MainWindow(Adw.ApplicationWindow):
         # Add header to main box instead of set_titlebar
         self.main_box.prepend(header)
 
-        # Discord button
+        # Discord button with custom SVG icon
         discord_button = Gtk.Button()
-        discord_button.set_icon_name("chat-symbolic")
+        discord_button.add_css_class("flat")
+        discord_icon_path = Path(__file__).parent / "icons" / "discord-symbolic.svg"
+        discord_icon = Gtk.Image.new_from_file(str(discord_icon_path))
+        discord_button.set_child(discord_icon)
         discord_button.set_tooltip_text("Join our Discord")
         discord_button.connect("clicked", self.on_discord_clicked)
         header.pack_start(discord_button)

@@ -655,41 +655,41 @@ class SteamAuthenticatorApp(Adw.Application):
             )
 
     def get_crimson_css(self):
-        """Crimson (Red Neon) theme"""
+        """Crimson (Red Neon) theme - dark background with red accents"""
         return b"""
             @define-color accent_color #ff0040;
             @define-color accent_bg_color #ff0040;
             @define-color accent_fg_color #ffffff;
-            @define-color window_bg_color #1a0005;
-            @define-color view_bg_color #220008;
-            @define-color card_bg_color #2a000a;
-            @define-color headerbar_bg_color #330011;
+            @define-color window_bg_color #1a1a1a;
+            @define-color view_bg_color #242424;
+            @define-color card_bg_color #2a2a2a;
+            @define-color headerbar_bg_color #242424;
 
-            window { background-color: #1a0005; }
+            window { background-color: #1a1a1a; }
             .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
                 color: #ff0040; text-shadow: 0 0 3px rgba(255, 0, 64, 0.5);
             }
             button.suggested-action {
-                background: linear-gradient(45deg, #ff0040, #ff3366);
+                background: linear-gradient(45deg, #cc0033, #ff0040);
                 border: 1px solid #ff0040;
             }
-            .card { background-color: #2a000a; border: 1px solid rgba(255, 0, 64, 0.15); }
-            headerbar { background: linear-gradient(90deg, #1a0005, #330011); border-bottom: 1px solid rgba(255, 0, 64, 0.3); }
-            .view, scrolledwindow > viewport { background-color: #220008; }
+            .card { background-color: #2a2a2a; border: 1px solid rgba(255, 0, 64, 0.2); }
+            headerbar { background-color: #242424; border-bottom: 1px solid rgba(255, 0, 64, 0.3); }
+            .view, scrolledwindow > viewport { background-color: #242424; }
         """
 
     def get_ocean_css(self):
-        """Ocean (Blue) theme"""
+        """Ocean (Blue) theme - dark background with blue accents"""
         return b"""
             @define-color accent_color #00a8ff;
             @define-color accent_bg_color #00a8ff;
             @define-color accent_fg_color #ffffff;
-            @define-color window_bg_color #001a2c;
-            @define-color view_bg_color #002240;
-            @define-color card_bg_color #003355;
-            @define-color headerbar_bg_color #002a4a;
+            @define-color window_bg_color #1a1a1a;
+            @define-color view_bg_color #242424;
+            @define-color card_bg_color #2a2a2a;
+            @define-color headerbar_bg_color #242424;
 
-            window { background-color: #001a2c; }
+            window { background-color: #1a1a1a; }
             .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
                 color: #00a8ff; text-shadow: 0 0 3px rgba(0, 168, 255, 0.5);
             }
@@ -697,23 +697,23 @@ class SteamAuthenticatorApp(Adw.Application):
                 background: linear-gradient(45deg, #0077b6, #00a8ff);
                 border: 1px solid #00a8ff;
             }
-            .card { background-color: #003355; border: 1px solid rgba(0, 168, 255, 0.15); }
-            headerbar { background: linear-gradient(90deg, #001a2c, #002a4a); border-bottom: 1px solid rgba(0, 168, 255, 0.3); }
-            .view, scrolledwindow > viewport { background-color: #002240; }
+            .card { background-color: #2a2a2a; border: 1px solid rgba(0, 168, 255, 0.2); }
+            headerbar { background-color: #242424; border-bottom: 1px solid rgba(0, 168, 255, 0.3); }
+            .view, scrolledwindow > viewport { background-color: #242424; }
         """
 
     def get_forest_css(self):
-        """Forest (Green) theme"""
+        """Forest (Green) theme - dark background with green accents"""
         return b"""
             @define-color accent_color #00d26a;
             @define-color accent_bg_color #00d26a;
             @define-color accent_fg_color #ffffff;
-            @define-color window_bg_color #0a1f0a;
-            @define-color view_bg_color #0f2a0f;
-            @define-color card_bg_color #143814;
-            @define-color headerbar_bg_color #1a4a1a;
+            @define-color window_bg_color #1a1a1a;
+            @define-color view_bg_color #242424;
+            @define-color card_bg_color #2a2a2a;
+            @define-color headerbar_bg_color #242424;
 
-            window { background-color: #0a1f0a; }
+            window { background-color: #1a1a1a; }
             .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
                 color: #00d26a; text-shadow: 0 0 3px rgba(0, 210, 106, 0.5);
             }
@@ -721,23 +721,23 @@ class SteamAuthenticatorApp(Adw.Application):
                 background: linear-gradient(45deg, #00a854, #00d26a);
                 border: 1px solid #00d26a;
             }
-            .card { background-color: #143814; border: 1px solid rgba(0, 210, 106, 0.15); }
-            headerbar { background: linear-gradient(90deg, #0a1f0a, #1a4a1a); border-bottom: 1px solid rgba(0, 210, 106, 0.3); }
-            .view, scrolledwindow > viewport { background-color: #0f2a0f; }
+            .card { background-color: #2a2a2a; border: 1px solid rgba(0, 210, 106, 0.2); }
+            headerbar { background-color: #242424; border-bottom: 1px solid rgba(0, 210, 106, 0.3); }
+            .view, scrolledwindow > viewport { background-color: #242424; }
         """
 
     def get_purple_css(self):
-        """Purple (Violet) theme"""
+        """Purple (Violet) theme - dark background with purple accents"""
         return b"""
             @define-color accent_color #a855f7;
             @define-color accent_bg_color #a855f7;
             @define-color accent_fg_color #ffffff;
-            @define-color window_bg_color #1a0a2e;
-            @define-color view_bg_color #240f3d;
-            @define-color card_bg_color #2e1450;
-            @define-color headerbar_bg_color #3b1a66;
+            @define-color window_bg_color #1a1a1a;
+            @define-color view_bg_color #242424;
+            @define-color card_bg_color #2a2a2a;
+            @define-color headerbar_bg_color #242424;
 
-            window { background-color: #1a0a2e; }
+            window { background-color: #1a1a1a; }
             .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
                 color: #a855f7; text-shadow: 0 0 3px rgba(168, 85, 247, 0.5);
             }
@@ -745,23 +745,23 @@ class SteamAuthenticatorApp(Adw.Application):
                 background: linear-gradient(45deg, #7c3aed, #a855f7);
                 border: 1px solid #a855f7;
             }
-            .card { background-color: #2e1450; border: 1px solid rgba(168, 85, 247, 0.15); }
-            headerbar { background: linear-gradient(90deg, #1a0a2e, #3b1a66); border-bottom: 1px solid rgba(168, 85, 247, 0.3); }
-            .view, scrolledwindow > viewport { background-color: #240f3d; }
+            .card { background-color: #2a2a2a; border: 1px solid rgba(168, 85, 247, 0.2); }
+            headerbar { background-color: #242424; border-bottom: 1px solid rgba(168, 85, 247, 0.3); }
+            .view, scrolledwindow > viewport { background-color: #242424; }
         """
 
     def get_sunset_css(self):
-        """Sunset (Orange) theme"""
+        """Sunset (Orange) theme - dark background with orange accents"""
         return b"""
             @define-color accent_color #ff6b35;
             @define-color accent_bg_color #ff6b35;
             @define-color accent_fg_color #ffffff;
-            @define-color window_bg_color #1f0f0a;
-            @define-color view_bg_color #2a1510;
-            @define-color card_bg_color #3d1f15;
-            @define-color headerbar_bg_color #4a2518;
+            @define-color window_bg_color #1a1a1a;
+            @define-color view_bg_color #242424;
+            @define-color card_bg_color #2a2a2a;
+            @define-color headerbar_bg_color #242424;
 
-            window { background-color: #1f0f0a; }
+            window { background-color: #1a1a1a; }
             .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
                 color: #ff6b35; text-shadow: 0 0 3px rgba(255, 107, 53, 0.5);
             }
@@ -769,9 +769,9 @@ class SteamAuthenticatorApp(Adw.Application):
                 background: linear-gradient(45deg, #e65100, #ff6b35);
                 border: 1px solid #ff6b35;
             }
-            .card { background-color: #3d1f15; border: 1px solid rgba(255, 107, 53, 0.15); }
-            headerbar { background: linear-gradient(90deg, #1f0f0a, #4a2518); border-bottom: 1px solid rgba(255, 107, 53, 0.3); }
-            .view, scrolledwindow > viewport { background-color: #2a1510; }
+            .card { background-color: #2a2a2a; border: 1px solid rgba(255, 107, 53, 0.2); }
+            headerbar { background-color: #242424; border-bottom: 1px solid rgba(255, 107, 53, 0.3); }
+            .view, scrolledwindow > viewport { background-color: #242424; }
         """
 
     def get_nord_css(self):
