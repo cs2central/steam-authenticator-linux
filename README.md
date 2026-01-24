@@ -27,11 +27,12 @@
 
 ## Features
 
+- **Set Up New Accounts** - Link Steam accounts directly from the app (no existing authenticator needed)
 - **2FA Code Generation** - Generate Steam Guard codes with live countdown timer
 - **Trade Confirmations** - View, accept, and deny trade confirmations
 - **Multiple Accounts** - Manage unlimited Steam accounts
 - **8 Beautiful Themes** - Light, Dark, Crimson, Ocean, Forest, Purple, Sunset, Nord
-- **Import/Export** - Import individual .maFile or entire folders
+- **Import/Export** - Import existing .maFile files or entire folders
 - **Backup & Restore** - Backup all accounts to a single file
 - **Steam Login** - Login directly to refresh session tokens
 - **Modern UI** - Built with GTK4 and libadwaita for native Linux experience
@@ -129,11 +130,22 @@ flatpak install flathub gg.cs2central.SteamAuthenticator
 
 ## Usage
 
-### Importing Accounts
+### Setting Up a New Account
+
+If your Steam account does **not** have Steam Guard enabled yet:
+
+1. Menu → **Set Up New Account**
+2. Enter your Steam username and password
+3. Steam will send a verification code to your phone (SMS) or email
+4. Enter the code to complete setup
+5. **Save your revocation code!** (needed to remove the authenticator later)
+
+### Importing Existing Accounts
+
+If you already have a `.maFile` from another authenticator:
 
 1. **Import Single File**: Menu → Import Account → Select your `.maFile`
 2. **Import Folder**: Menu → Import Folder → Select folder containing `.maFile` files
-3. **Manual Entry**: Menu → Add Account → Enter account details manually
 
 Your `.maFile` should contain:
 ```json
