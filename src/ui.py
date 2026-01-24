@@ -298,12 +298,38 @@ class MainWindow(Adw.ApplicationWindow):
     
     def on_account_row_activated(self, row):
         if not self.accounts:
+            # Show options to add account
+            self.show_no_account_dialog()
             return
-        
+
         # Create advanced account selector for large numbers of accounts
         selector = AccountSelectorDialog(self, self.accounts, self.current_account)
         selector.connect("account-selected", self.on_account_selected)
         selector.present()
+
+    def show_no_account_dialog(self):
+        """Show dialog with options to add an account"""
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="No Accounts",
+            body="Add a Steam account to get started",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("setup", "Set Up New Account")
+        dialog.add_response("import", "Import Existing")
+
+        dialog.set_response_appearance("setup", Adw.ResponseAppearance.SUGGESTED)
+
+        dialog.connect("response", self.on_no_account_response)
+        dialog.present()
+
+    def on_no_account_response(self, dialog, response):
+        """Handle response from no account dialog"""
+        app = self.get_application()
+        if response == "setup":
+            app.activate_action("setup_account")
+        elif response == "import":
+            app.activate_action("import_account")
     
     def on_account_selected(self, dialog, account):
         """Handle account selection from the advanced dialog"""
