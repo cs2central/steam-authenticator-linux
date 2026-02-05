@@ -4,7 +4,10 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>Steam Authenticator</name>
-  <summary>Steam 2FA code generator and trade confirmation manager</summary>
+  <summary>Steam Guard 2FA code manager</summary>
+  <developer id="gg.cs2central">
+    <name>zorex</name>
+  </developer>
   <description>
     <p>
       Steam Authenticator for Linux is a modern application for managing Steam Guard
@@ -27,24 +30,28 @@
   <url type="homepage">https://cs2central.gg/</url>
   <url type="bugtracker">https://github.com/cs2central/steam-authenticator-linux/issues</url>
   <url type="help">https://discord.gg/cs2central</url>
-  <developer_name>zorex</developer_name>
-  <update_contact>info@cs2central.gg</update_contact>
+  <url type="vcs-browser">https://github.com/cs2central/steam-authenticator-linux</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#1a9fff</color>
+    <color type="primary" scheme_preference="dark">#171a21</color>
+  </branding>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="1.0.0" date="2026-01-24">
+    <release version="1.0.0" date="2026-02-05">
       <description>
-        <p>Initial release with full feature set</p>
+        <p>Initial stable release with full feature set including 2FA code generation,
+        trade confirmation management, multiple account support, and 8 built-in themes.</p>
       </description>
     </release>
   </releases>
   <screenshots>
     <screenshot type="default">
-      <caption>Light theme</caption>
-      <image>https://raw.githubusercontent.com/cs2central/steam-authenticator-linux/main/assets/light-theme.webp</image>
+      <caption>Light theme with 2FA code display</caption>
+      <image>https://raw.githubusercontent.com/cs2central/steam-authenticator-linux/v1.0.0/assets/light-theme.png</image>
     </screenshot>
     <screenshot>
-      <caption>Nord theme</caption>
-      <image>https://raw.githubusercontent.com/cs2central/steam-authenticator-linux/main/assets/nord-theme.webp</image>
+      <caption>Nord dark theme</caption>
+      <image>https://raw.githubusercontent.com/cs2central/steam-authenticator-linux/v1.0.0/assets/nord-theme.png</image>
     </screenshot>
   </screenshots>
   <keywords>

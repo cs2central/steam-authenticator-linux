@@ -28,5 +28,7 @@ modules:
       - install -Dm644 assets/icon.png ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/gg.cs2central.SteamAuthenticator.png
       - install -Dm644 assets/icon.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/gg.cs2central.SteamAuthenticator.svg
     sources:
-      - type: dir
-        path: ../..
+      - type: git
+        url: https://github.com/cs2central/steam-authenticator-linux.git
+        tag: v1.0.0
+        commit: 144309f9bb8a94895d6461726dd0cb99b8ed9bed
