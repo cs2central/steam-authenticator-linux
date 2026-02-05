@@ -14,16 +14,17 @@ from steam_guard import SteamGuardAccount
 class LoginDialog(Adw.Window):
     """Steam login dialog similar to Windows Steam Desktop Authenticator"""
     
-    def __init__(self, parent_window, **kwargs):
+    def __init__(self, parent_window, account=None, **kwargs):
         super().__init__(**kwargs)
-        
+
         self.set_title("Steam Login")
         self.set_default_size(380, 480)  # Slightly smaller and more compact
         self.set_transient_for(parent_window)
         self.set_modal(True)
-        
+
         self.login_result = None
         self.pending_auth = None
+        self.account = account
         
         self.setup_ui()
     
@@ -192,12 +193,18 @@ class LoginDialog(Adw.Window):
             async def do_login():
                 async with SteamProtobufLogin() as steam_login:
                     # Check if this account has Steam Guard enabled
-                    parent_app = self.get_transient_for().get_application()
-                    current_account = parent_app.current_account
-                    
+                    current_account = self.account
+                    if current_account is None:
+                        try:
+                            parent_app = self.get_transient_for().get_application()
+                            if parent_app:
+                                current_account = parent_app.current_account
+                        except Exception:
+                            pass
+
                     # If this is the same account we have loaded, use automatic 2FA
-                    if (current_account and 
-                        current_account.account_name == username and 
+                    if (current_account and
+                        current_account.account_name == username and
                         current_account.shared_secret):
                         
                         # Create auto 2FA callback

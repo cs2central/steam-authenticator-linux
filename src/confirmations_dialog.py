@@ -8,6 +8,8 @@ from typing import List, Dict, Any
 
 from steam_guard import SteamGuardAccount
 from steam_api import SteamAPI
+from login_dialog import LoginDialog
+from mafile_manager import MaFileManager
 
 
 class ExpandableConfirmationRow(Gtk.ListBoxRow):
@@ -329,11 +331,53 @@ class ConfirmationsDialog(Adw.Window):
         
         content_box.append(self.empty_box)
         self.empty_box.set_visible(False)
+
+        # Expired session state
+        self.expired_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        self.expired_box.set_vexpand(True)
+        self.expired_box.set_valign(Gtk.Align.CENTER)
+
+        expired_icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
+        expired_icon.set_pixel_size(64)
+        expired_icon.add_css_class("dim-label")
+        self.expired_box.append(expired_icon)
+
+        expired_label = Gtk.Label(label="Session Expired")
+        expired_label.add_css_class("title-2")
+        self.expired_box.append(expired_label)
+
+        expired_desc = Gtk.Label(label="Your session has expired. Please log in again to manage trade confirmations.")
+        expired_desc.add_css_class("dim-label")
+        expired_desc.set_wrap(True)
+        expired_desc.set_max_width_chars(40)
+        expired_desc.set_justify(Gtk.Justification.CENTER)
+        self.expired_box.append(expired_desc)
+
+        login_button = Gtk.Button(label="Log In")
+        login_button.add_css_class("suggested-action")
+        login_button.add_css_class("pill")
+        login_button.set_halign(Gtk.Align.CENTER)
+        login_button.set_margin_top(8)
+        login_button.connect("clicked", self.on_login_clicked)
+        self.expired_box.append(login_button)
+
+        content_box.append(self.expired_box)
+        self.expired_box.set_visible(False)
     
     def refresh_confirmations(self):
         self.loading_box.set_visible(True)
         self.confirmations_list.set_visible(False)
         self.empty_box.set_visible(False)
+        self.expired_box.set_visible(False)
+
+        # Check token expiration before fetching
+        token_status = self.account.check_token_expiration()
+        if not token_status["access_token_valid"] and not token_status["refresh_token_valid"]:
+            self.loading_box.set_visible(False)
+            self.expired_box.set_visible(True)
+            self.accept_all_button.set_sensitive(False)
+            self.deny_all_button.set_sensitive(False)
+            return
         
         # Clear existing confirmations
         while self.confirmations_list.get_first_child():
@@ -523,6 +567,31 @@ class ConfirmationsDialog(Adw.Window):
         thread.daemon = True
         thread.start()
     
+    def on_login_clicked(self, button):
+        """Open login dialog for re-authentication"""
+        dialog = LoginDialog(self, account=self.account)
+
+        if hasattr(dialog, 'username_entry') and self.account.account_name:
+            dialog.username_entry.set_text(self.account.account_name)
+
+        dialog.present()
+
+        def on_dialog_close(dialog):
+            login_result = dialog.get_login_result()
+            if login_result and login_result.get("success"):
+                import time
+                if login_result.get("access_token"):
+                    self.account.session_data["access_token"] = login_result["access_token"]
+                    self.account.session_data["token_timestamp"] = int(time.time())
+                if login_result.get("refresh_token"):
+                    self.account.session_data["refresh_token"] = login_result["refresh_token"]
+
+                MaFileManager().save_mafile(self.account)
+                self.show_toast("Session refreshed successfully")
+                self.refresh_confirmations()
+
+        dialog.connect("close-request", on_dialog_close)
+
     def show_toast(self, message: str):
         toast = Adw.Toast(title=message)
         toast.set_timeout(2)

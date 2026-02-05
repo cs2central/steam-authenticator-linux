@@ -17,7 +17,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y gir1.2-gtk-4.0 gir1.2-adw-1 libgtk-4-1 libadwaita-1-0 \
           python3-gi python3-gi-cairo python3-pip python3-venv \
-          python3-aiohttp python3-cryptography python3-pil python3-requests
+          python3-aiohttp python3-cryptography python3-pil python3-requests \
+          python3-qrcode
 
     - name: Install remaining Python dependencies
       run: pip3 install qrcode argon2-cffi --break-system-packages

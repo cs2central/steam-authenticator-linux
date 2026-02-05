@@ -1,16 +1,136 @@
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib, Gio, GObject, Pango
+from gi.repository import Gtk, Adw, GLib, Gio, GObject, Pango, GdkPixbuf, Gdk
 import asyncio
+import threading
 from typing import Optional
 import qrcode
 from io import BytesIO
 from pathlib import Path
+import logging
 
 from steam_guard import SteamGuardAccount
 from steam_api import SteamAPI
 from confirmations_dialog import ConfirmationsDialog
+
+
+class AvatarWidget(Gtk.Box):
+    """Widget to display Steam avatar with fallback to initial letter"""
+
+    def __init__(self, size: int = 40):
+        super().__init__()
+        self.size = size
+        self.set_size_request(size, size)
+
+        # Stack to switch between avatar image and fallback
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.append(self.stack)
+
+        # Fallback label (initial letter) - use overlay for perfect centering
+        self.fallback_frame = Gtk.Frame()
+        self.fallback_frame.set_size_request(size, size)
+        self.fallback_frame.add_css_class("avatar-fallback")
+
+        self.initial_label = Gtk.Label()
+        self.initial_label.set_halign(Gtk.Align.CENTER)
+        self.initial_label.set_valign(Gtk.Align.CENTER)
+        self.initial_label.add_css_class("avatar-initial")
+        self.fallback_frame.set_child(self.initial_label)
+        self.stack.add_named(self.fallback_frame, "fallback")
+
+        # Avatar image
+        self.avatar_picture = Gtk.Picture()
+        self.avatar_picture.set_size_request(size, size)
+        self.avatar_picture.set_content_fit(Gtk.ContentFit.COVER)
+        self.avatar_picture.add_css_class("avatar-image")
+        self.stack.add_named(self.avatar_picture, "avatar")
+
+        # Start with fallback
+        self.stack.set_visible_child_name("fallback")
+
+        # Apply CSS
+        self._apply_css()
+
+    def _apply_css(self):
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(f"""
+            .avatar-fallback {{
+                background: linear-gradient(135deg, @accent_color, @accent_bg_color);
+                border-radius: {self.size // 2}px;
+                min-width: {self.size}px;
+                min-height: {self.size}px;
+                border: none;
+            }}
+            .avatar-initial {{
+                color: white;
+                font-weight: bold;
+                font-size: {self.size // 2}px;
+            }}
+            .avatar-image {{
+                border-radius: {self.size // 2}px;
+            }}
+        """.encode())
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
+    def set_initial(self, initial: str):
+        """Set the fallback initial letter"""
+        self.initial_label.set_text(initial.upper() if initial else "?")
+
+    def set_avatar_url(self, url: str):
+        """Load and display avatar from URL"""
+        if not url or not url.startswith(("http://", "https://")):
+            self.stack.set_visible_child_name("fallback")
+            return
+
+        # Load image in background thread
+        def load_image():
+            try:
+                import urllib.request
+                with urllib.request.urlopen(url, timeout=5) as response:
+                    content_type = response.headers.get("Content-Type", "")
+                    if not content_type.startswith("image/"):
+                        raise ValueError(f"Not an image: {content_type}")
+
+                    data = response.read(5 * 1024 * 1024)  # 5MB max
+                    if len(data) < 16:
+                        raise ValueError("Image data too small")
+
+                # Create pixbuf from data
+                loader = GdkPixbuf.PixbufLoader()
+                loader.write(data)
+                loader.close()
+                pixbuf = loader.get_pixbuf()
+
+                if not pixbuf or pixbuf.get_width() < 1 or pixbuf.get_height() < 1:
+                    raise ValueError("Invalid image dimensions")
+
+                # Scale to size
+                scaled = pixbuf.scale_simple(
+                    self.size, self.size,
+                    GdkPixbuf.InterpType.BILINEAR
+                )
+
+                GLib.idle_add(self._set_pixbuf, scaled)
+            except Exception as e:
+                logging.debug(f"Failed to load avatar: {e}")
+                GLib.idle_add(lambda: self.stack.set_visible_child_name("fallback"))
+
+        thread = threading.Thread(target=load_image, daemon=True)
+        thread.start()
+
+    def _set_pixbuf(self, pixbuf):
+        """Set the avatar pixbuf (called from main thread)"""
+        if pixbuf:
+            texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+            self.avatar_picture.set_paintable(texture)
+            self.stack.set_visible_child_name("avatar")
+        return False
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -18,7 +138,7 @@ class MainWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
         
         self.set_title("Steam Authenticator")
-        self.set_default_size(450, 650)  # Slightly wider to prevent text truncation
+        self.set_default_size(450, 720)  # Height to fit all content
         
         self.current_account = None
         self.accounts = []
@@ -50,6 +170,11 @@ class MainWindow(Adw.ApplicationWindow):
         content_box.set_margin_end(16)
         scrolled.set_child(content_box)
         
+        # Account section
+        account_group = Adw.PreferencesGroup()
+        account_group.set_title("Account")
+        content_box.append(account_group)
+
         # Account selector
         self.account_row = Adw.ActionRow()
         self.account_row.set_title("No Account Selected")
@@ -57,11 +182,16 @@ class MainWindow(Adw.ApplicationWindow):
         self.account_row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
         self.account_row.set_activatable(True)
         self.account_row.connect("activated", self.on_account_row_activated)
-        
-        account_group = Adw.PreferencesGroup()
-        account_group.set_title("Account")
         account_group.add(self.account_row)
-        content_box.append(account_group)
+
+        # Refresh profile row (belongs with Account, not Confirmations)
+        refresh_profile_row = Adw.ActionRow()
+        refresh_profile_row.set_title("Refresh Profile")
+        refresh_profile_row.set_subtitle("Fetch avatar and display name from Steam")
+        refresh_profile_row.add_suffix(Gtk.Image.new_from_icon_name("view-refresh-symbolic"))
+        refresh_profile_row.set_activatable(True)
+        refresh_profile_row.connect("activated", self.on_refresh_profile_activated)
+        account_group.add(refresh_profile_row)
         
         # Steam Guard Code section
         code_group = Adw.PreferencesGroup()
@@ -161,34 +291,33 @@ class MainWindow(Adw.ApplicationWindow):
         confirmations_group = Adw.PreferencesGroup()
         confirmations_group.set_title("Trade Confirmations")
         content_box.append(confirmations_group)
-        
-        # Session status row
-        self.session_status_row = Adw.ActionRow()
-        self.session_status_row.set_title("Check Session Status")  # Removed emoji to save space
-        self.session_status_row.set_subtitle("Verify token status")
-        self.session_status_row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
-        self.session_status_row.set_activatable(True)
-        self.session_status_row.connect("activated", self.on_check_session_status)
-        confirmations_group.add(self.session_status_row)
-        
-        # Steam login button (prominent)
-        steam_login_row = Adw.ActionRow()
-        steam_login_row.set_title("Login to Steam")  # Removed emoji to save space
-        steam_login_row.set_subtitle("Generate fresh tokens for confirmations")
-        steam_login_row.set_subtitle_lines(0)  # Allow subtitle to wrap
-        steam_login_row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
-        steam_login_row.set_activatable(True)
-        steam_login_row.connect("activated", self.on_steam_login_activated)
-        confirmations_group.add(steam_login_row)
-        
-        # Open confirmations button
+
+        # View confirmations (primary action)
         confirmations_row = Adw.ActionRow()
         confirmations_row.set_title("View Confirmations")
-        confirmations_row.set_subtitle("Open trade confirmations window")
+        confirmations_row.set_subtitle("Accept or deny pending trades")
         confirmations_row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
         confirmations_row.set_activatable(True)
         confirmations_row.connect("activated", self.on_open_confirmations)
         confirmations_group.add(confirmations_row)
+
+        # Steam login button
+        steam_login_row = Adw.ActionRow()
+        steam_login_row.set_title("Login to Steam")
+        steam_login_row.set_subtitle("Refresh session tokens")
+        steam_login_row.add_suffix(Gtk.Image.new_from_icon_name("go-next-symbolic"))
+        steam_login_row.set_activatable(True)
+        steam_login_row.connect("activated", self.on_steam_login_activated)
+        confirmations_group.add(steam_login_row)
+
+        # Session status row (less prominent)
+        self.session_status_row = Adw.ActionRow()
+        self.session_status_row.set_title("Session Status")
+        self.session_status_row.set_subtitle("Click to check")
+        self.session_status_row.add_suffix(Gtk.Image.new_from_icon_name("dialog-information-symbolic"))
+        self.session_status_row.set_activatable(True)
+        self.session_status_row.connect("activated", self.on_check_session_status)
+        confirmations_group.add(self.session_status_row)
     
     def setup_headerbar(self):
         # Header bar
@@ -200,9 +329,7 @@ class MainWindow(Adw.ApplicationWindow):
         # Discord button with custom SVG icon
         discord_button = Gtk.Button()
         discord_button.add_css_class("flat")
-        discord_icon_path = Path(__file__).parent / "icons" / "discord-symbolic.svg"
-        discord_icon = Gtk.Image.new_from_file(str(discord_icon_path))
-        discord_button.set_child(discord_icon)
+        discord_button.set_icon_name("discord-symbolic")
         discord_button.set_tooltip_text("Join our Discord")
         discord_button.connect("clicked", self.on_discord_clicked)
         header.pack_start(discord_button)
@@ -219,31 +346,23 @@ class MainWindow(Adw.ApplicationWindow):
         menu_button.set_icon_name("open-menu-symbolic")
         header.pack_end(menu_button)
         
-        # Create menu
+        # Create simplified menu
         menu = Gio.Menu()
-        menu.append("Set Up New Account", "app.setup_account")
-        menu.append("Import Account", "app.import_account")
-        menu.append("Import Folder", "app.import_folder")
-        menu.append("Export Account", "app.export_account")
-        menu.append_section(None, self.create_backup_menu_section())
-        menu.append_section(None, self.create_account_menu_section())
-        menu.append_section(None, self.create_app_menu_section())
-        
-        menu_button.set_menu_model(menu)
-    
-    def create_backup_menu_section(self):
-        section = Gio.Menu()
-        section.append("Backup All Accounts", "app.backup_all")
-        section.append("Restore from Backup", "app.restore_backup")
-        return section
 
-    def create_account_menu_section(self):
-        section = Gio.Menu()
-        section.append("Login to Steam", "app.steam_login")
-        section.append("Refresh Sessions", "app.refresh_token")
-        section.append("Remove Current Account", "app.remove_account")
-        return section
-    
+        # Primary actions
+        menu.append("Set Up New Account", "app.setup_account")
+        menu.append("Import & Export...", "app.show_import_export")
+
+        # Account section
+        account_section = Gio.Menu()
+        account_section.append("Remove Account", "app.remove_account")
+        menu.append_section(None, account_section)
+
+        # App section
+        menu.append_section(None, self.create_app_menu_section())
+
+        menu_button.set_menu_model(menu)
+
     def create_app_menu_section(self):
         section = Gio.Menu()
         section.append("Preferences", "app.preferences")
@@ -256,10 +375,22 @@ class MainWindow(Adw.ApplicationWindow):
     
     def set_current_account(self, account: Optional[SteamGuardAccount]):
         self.current_account = account
-        
+
         if account:
-            self.account_row.set_title(account.account_name)
-            self.account_row.set_subtitle(f"Steam ID: {account.steamid or 'Not logged in'}")
+            # Show display name if available, otherwise account name
+            display_name = account.get_display_name_or_username()
+            self.account_row.set_title(display_name)
+
+            # Build subtitle with account info
+            subtitle_parts = []
+            if account.display_name and account.display_name != account.account_name:
+                subtitle_parts.append(f"@{account.account_name}")
+            if account.steamid:
+                subtitle_parts.append(f"ID: {account.steamid}")
+            else:
+                subtitle_parts.append("Not logged in")
+
+            self.account_row.set_subtitle(" | ".join(subtitle_parts))
             
             # Reset session status
             self.session_status_row.set_title("Check Session Status")
@@ -454,11 +585,22 @@ class MainWindow(Adw.ApplicationWindow):
         if not self.current_account:
             self.show_toast("No account selected")
             return
-        
+
         # Trigger the Steam login action
         app = self.get_application()
         if app:
             app.on_steam_login_action(None, None)
+
+    def on_refresh_profile_activated(self, row):
+        """Handle refresh profile activation"""
+        if not self.current_account:
+            self.show_toast("No account selected")
+            return
+
+        # Trigger the refresh profile action
+        app = self.get_application()
+        if app:
+            app.on_refresh_profile_action(None, None)
     
     def refresh_account_list(self):
         # This would refresh the account list in the UI
@@ -750,47 +892,76 @@ class AccountSelectorDialog(Adw.Window):
         self.count_label.set_text(f"{len(self.filtered_accounts)} of {len(self.accounts)} accounts")
     
     def create_account_row(self, account):
-        """Create a row for an account"""
+        """Create a row for an account with avatar"""
         row = Adw.ActionRow()
         row.set_activatable(True)
         row.connect("activated", lambda _: self.on_account_clicked(account))
-        
-        # Account name and Steam ID
-        row.set_title(account.account_name)
-        
-        # Add Steam ID and status info
+
+        # Show display name if available, otherwise account name
+        display_name = account.get_display_name_or_username()
+        row.set_title(display_name)
+
+        # Build subtitle with account info
         status_info = []
+
+        # Show login username if different from display name
+        if account.display_name and account.display_name != account.account_name:
+            status_info.append(f"@{account.account_name}")
+
         if account.steamid:
             status_info.append(f"ID: {account.steamid}")
-        
+
         # Check token status
         if hasattr(account, 'check_token_expiration'):
             token_status = account.check_token_expiration()
             if token_status.get("access_token_valid"):
-                status_info.append("✅ Valid tokens")
+                status_info.append("Valid")
             elif token_status.get("refresh_token_valid"):
-                status_info.append("🔄 Needs refresh")
+                status_info.append("Refresh needed")
             else:
-                status_info.append("❌ Expired tokens")
-        
-        row.set_subtitle(" • ".join(status_info))
-        
-        # Current account indicator
+                status_info.append("Expired")
+
+        # Add ban indicators if present
+        if account.vac_banned:
+            status_info.append("VAC")
+        if account.trade_banned:
+            status_info.append("Trade Ban")
+
+        row.set_subtitle(" | ".join(status_info))
+
+        # Avatar with fallback to initial
+        avatar = AvatarWidget(size=40)
+        avatar.set_initial(account.get_avatar_initial())
+        if account.avatar_url:
+            avatar.set_avatar_url(account.avatar_url)
+
+        # Current account indicator overlay
         if account == self.current_account:
-            current_icon = Gtk.Image.new_from_icon_name("emblem-default-symbolic")
-            current_icon.set_pixel_size(16)
-            current_icon.set_tooltip_text("Current account")
-            row.add_prefix(current_icon)
+            avatar_box = Gtk.Overlay()
+            avatar_box.set_child(avatar)
+
+            current_badge = Gtk.Image.new_from_icon_name("emblem-default-symbolic")
+            current_badge.set_pixel_size(14)
+            current_badge.set_halign(Gtk.Align.END)
+            current_badge.set_valign(Gtk.Align.END)
+            current_badge.set_tooltip_text("Current account")
+            avatar_box.add_overlay(current_badge)
+
+            row.add_prefix(avatar_box)
         else:
-            # Account icon
-            account_icon = Gtk.Image.new_from_icon_name("avatar-default-symbolic")
-            account_icon.set_pixel_size(32)
-            row.add_prefix(account_icon)
-        
+            row.add_prefix(avatar)
+
+        # Game count badge if available
+        if account.total_games > 0:
+            games_label = Gtk.Label(label=f"{account.total_games} games")
+            games_label.add_css_class("dim-label")
+            games_label.set_margin_end(8)
+            row.add_suffix(games_label)
+
         # Arrow icon
         arrow = Gtk.Image.new_from_icon_name("go-next-symbolic")
         row.add_suffix(arrow)
-        
+
         return row
     
     def on_account_clicked(self, account):
@@ -860,3 +1031,117 @@ class AccountSelectorDialog(Adw.Window):
         elif not self.all_button.get_active() and not self.valid_tokens_button.get_active():
             # Ensure at least one button is always active
             button.set_active(True)
+
+
+class ImportExportDialog(Adw.Window):
+    """Dialog for all import/export operations"""
+
+    def __init__(self, parent_window, **kwargs):
+        super().__init__(**kwargs)
+
+        self.set_title("Import & Export")
+        self.set_default_size(400, 450)
+        self.set_transient_for(parent_window)
+        self.set_modal(True)
+
+        self.app = parent_window.get_application()
+        self.setup_ui()
+
+    def setup_ui(self):
+        # Main box
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.set_content(main_box)
+
+        # Header bar
+        header = Adw.HeaderBar()
+        main_box.append(header)
+
+        # Content
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content.set_margin_top(12)
+        content.set_margin_bottom(12)
+        content.set_margin_start(12)
+        content.set_margin_end(12)
+        main_box.append(content)
+
+        # Import section
+        import_group = Adw.PreferencesGroup()
+        import_group.set_title("Import")
+        import_group.set_description("Add accounts from files")
+        content.append(import_group)
+
+        # Import single file
+        import_file_row = Adw.ActionRow()
+        import_file_row.set_title("Import Account")
+        import_file_row.set_subtitle("Import a single .maFile")
+        import_file_row.add_suffix(Gtk.Image.new_from_icon_name("document-open-symbolic"))
+        import_file_row.set_activatable(True)
+        import_file_row.connect("activated", self.on_import_account)
+        import_group.add(import_file_row)
+
+        # Import folder
+        import_folder_row = Adw.ActionRow()
+        import_folder_row.set_title("Import Folder")
+        import_folder_row.set_subtitle("Import all .maFiles from a folder")
+        import_folder_row.add_suffix(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
+        import_folder_row.set_activatable(True)
+        import_folder_row.connect("activated", self.on_import_folder)
+        import_group.add(import_folder_row)
+
+        # Restore backup
+        restore_row = Adw.ActionRow()
+        restore_row.set_title("Restore Backup")
+        restore_row.set_subtitle("Restore accounts from a .zip backup")
+        restore_row.add_suffix(Gtk.Image.new_from_icon_name("document-open-symbolic"))
+        restore_row.set_activatable(True)
+        restore_row.connect("activated", self.on_restore_backup)
+        import_group.add(restore_row)
+
+        # Export section
+        export_group = Adw.PreferencesGroup()
+        export_group.set_title("Export")
+        export_group.set_description("Save accounts to files")
+        content.append(export_group)
+
+        # Export current account
+        export_row = Adw.ActionRow()
+        export_row.set_title("Export Account")
+        export_row.set_subtitle("Export current account as .maFile")
+        export_row.add_suffix(Gtk.Image.new_from_icon_name("document-save-symbolic"))
+        export_row.set_activatable(True)
+        export_row.connect("activated", self.on_export_account)
+        export_group.add(export_row)
+
+        # Backup all
+        backup_row = Adw.ActionRow()
+        backup_row.set_title("Backup All Accounts")
+        backup_row.set_subtitle("Save all accounts to a .zip file")
+        backup_row.add_suffix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
+        backup_row.set_activatable(True)
+        backup_row.connect("activated", self.on_backup_all)
+        export_group.add(backup_row)
+
+    def on_import_account(self, row):
+        self.close()
+        if self.app:
+            self.app.activate_action("import_account")
+
+    def on_import_folder(self, row):
+        self.close()
+        if self.app:
+            self.app.activate_action("import_folder")
+
+    def on_restore_backup(self, row):
+        self.close()
+        if self.app:
+            self.app.activate_action("restore_backup")
+
+    def on_export_account(self, row):
+        self.close()
+        if self.app:
+            self.app.activate_action("export_account")
+
+    def on_backup_all(self, row):
+        self.close()
+        if self.app:
+            self.app.activate_action("backup_all")

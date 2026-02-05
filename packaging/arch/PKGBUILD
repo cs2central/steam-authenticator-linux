@@ -43,13 +43,17 @@ EOF
 
     # Install desktop file
     install -Dm644 packaging/flatpak/gg.cs2central.SteamAuthenticator.desktop \
-        "$pkgdir/usr/share/applications/steam-authenticator.desktop"
+        "$pkgdir/usr/share/applications/gg.cs2central.SteamAuthenticator.desktop"
 
-    # Update desktop file paths
+    # Update desktop file Exec path
     sed -i 's|Exec=steam-authenticator|Exec=/usr/bin/steam-authenticator|' \
-        "$pkgdir/usr/share/applications/steam-authenticator.desktop"
-    sed -i 's|Icon=gg.cs2central.SteamAuthenticator|Icon=steam|' \
-        "$pkgdir/usr/share/applications/steam-authenticator.desktop"
+        "$pkgdir/usr/share/applications/gg.cs2central.SteamAuthenticator.desktop"
+
+    # Install icons
+    install -Dm644 assets/icon.png \
+        "$pkgdir/usr/share/icons/hicolor/256x256/apps/gg.cs2central.SteamAuthenticator.png"
+    install -Dm644 assets/icon.svg \
+        "$pkgdir/usr/share/icons/hicolor/scalable/apps/gg.cs2central.SteamAuthenticator.svg"
 
     # Install license
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

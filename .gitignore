@@ -39,6 +39,9 @@ ENV/
 *.log
 steam_authenticator.log
 
+# Unrelated project directories
+steam-hour-boost/
+
 # OS
 .DS_Store
 Thumbs.db

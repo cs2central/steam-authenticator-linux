@@ -9,5 +9,5 @@ Icon=gg.cs2central.SteamAuthenticator
 Terminal=false
 Categories=Network;Security;Game;
 StartupNotify=true
-StartupWMClass=steam-authenticator
+StartupWMClass=gg.cs2central.SteamAuthenticator
 Keywords=Steam;2FA;Authenticator;Gaming;Trade;Guard;

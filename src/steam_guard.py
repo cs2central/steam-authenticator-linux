@@ -14,21 +14,29 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 class SteamGuardAccount:
     STEAM_GUARD_CODE_CHARS = "23456789BCDFGHJKMNPQRTVWXY"
-    
+
     def __init__(self, account_data: Optional[Dict[str, Any]] = None):
         if account_data:
             self.account_name = account_data.get("account_name", "")
             self.shared_secret = account_data.get("shared_secret", "")
             self.identity_secret = account_data.get("identity_secret", "")
             self.device_id = account_data.get("device_id", "")
-            
+
             # Handle different Steam ID formats
             self.steamid = self._extract_steamid(account_data)
-            
+
             # Handle different session formats
             self.session_data = self._extract_session_data(account_data)
-            
+
+            # Profile data (fetched from Steam Web API)
             self.avatar_url = account_data.get("avatar_url", "")
+            self.display_name = account_data.get("display_name", "")
+            self.total_games = account_data.get("total_games", 0)
+            self.vac_banned = account_data.get("vac_banned", False)
+            self.trade_banned = account_data.get("trade_banned", False)
+            self.game_bans = account_data.get("game_bans", 0)
+            self.profile_visibility = account_data.get("profile_visibility", 0)
+            self.last_api_refresh = account_data.get("last_api_refresh", "")
         else:
             self.account_name = ""
             self.shared_secret = ""
@@ -36,7 +44,15 @@ class SteamGuardAccount:
             self.device_id = self.generate_device_id()
             self.steamid = ""
             self.session_data = {}
+            # Profile data defaults
             self.avatar_url = ""
+            self.display_name = ""
+            self.total_games = 0
+            self.vac_banned = False
+            self.trade_banned = False
+            self.game_bans = 0
+            self.profile_visibility = 0
+            self.last_api_refresh = ""
     
     def _extract_steamid(self, account_data: Dict[str, Any]) -> str:
         """Extract Steam ID from various possible locations in the account data"""
@@ -171,8 +187,36 @@ class SteamGuardAccount:
             "device_id": self.device_id,
             "steamid": self.steamid,
             "session": self.session_data,
-            "avatar_url": self.avatar_url
+            # Profile data from Steam Web API
+            "avatar_url": self.avatar_url,
+            "display_name": self.display_name,
+            "total_games": self.total_games,
+            "vac_banned": self.vac_banned,
+            "trade_banned": self.trade_banned,
+            "game_bans": self.game_bans,
+            "profile_visibility": self.profile_visibility,
+            "last_api_refresh": self.last_api_refresh,
         }
+
+    def get_display_name_or_username(self) -> str:
+        """Get display name if available, otherwise account name"""
+        if self.display_name:
+            # Sanitize: strip control characters, limit length
+            sanitized = ''.join(c for c in self.display_name if c.isprintable())
+            sanitized = sanitized.strip()
+            if sanitized:
+                return sanitized[:64]
+        return self.account_name if self.account_name else "Unknown"
+
+    def get_avatar_initial(self) -> str:
+        """Get the first character of display name or account name for avatar fallback"""
+        name = self.display_name if self.display_name else self.account_name
+        if name:
+            # Find first alphanumeric character
+            for c in name:
+                if c.isalnum():
+                    return c.upper()
+        return "?"
 
 
 class Manifest:

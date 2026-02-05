@@ -23,10 +23,12 @@ jobs:
           --exclude='__pycache__' \
           --exclude='*.pyc' \
           --exclude='*.log' \
+          --exclude='steam-hour-boost' \
+          --exclude='src/maFiles' \
           .
 
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: release/*
         generate_release_notes: true

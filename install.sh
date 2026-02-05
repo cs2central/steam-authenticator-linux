@@ -131,11 +131,11 @@ install_icon() {
 
     # Install PNG icon
     mkdir -p "$HOME/.local/share/icons/hicolor/256x256/apps"
-    cp "$SCRIPT_DIR/assets/icon.png" "$HOME/.local/share/icons/hicolor/256x256/apps/steam-authenticator.png"
+    cp "$SCRIPT_DIR/assets/icon.png" "$HOME/.local/share/icons/hicolor/256x256/apps/gg.cs2central.SteamAuthenticator.png"
 
     # Install SVG icon
     mkdir -p "$HOME/.local/share/icons/hicolor/scalable/apps"
-    cp "$SCRIPT_DIR/assets/icon.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/steam-authenticator.svg"
+    cp "$SCRIPT_DIR/assets/icon.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/gg.cs2central.SteamAuthenticator.svg"
 
     # Update icon cache
     if command -v gtk-update-icon-cache &> /dev/null; then
@@ -147,7 +147,7 @@ install_icon() {
 create_desktop_entry() {
     echo -e "${GREEN}Creating desktop entry...${NC}"
 
-    local desktop_file="$HOME/.local/share/applications/steam-authenticator.desktop"
+    local desktop_file="$HOME/.local/share/applications/gg.cs2central.SteamAuthenticator.desktop"
     mkdir -p "$HOME/.local/share/applications"
 
     cat > "$desktop_file" << EOF
@@ -157,12 +157,12 @@ Type=Application
 Name=Steam Authenticator
 Comment=A modern Steam Authenticator for Linux with 2FA code generation and trade confirmation support
 Exec="$SCRIPT_DIR/run.sh"
-Icon=steam-authenticator
+Icon=gg.cs2central.SteamAuthenticator
 Path=$SCRIPT_DIR
 Terminal=false
 Categories=Network;Security;Game;
 StartupNotify=true
-StartupWMClass=com.github.steamauthenticator
+StartupWMClass=gg.cs2central.SteamAuthenticator
 Keywords=Steam;2FA;Authenticator;Gaming;Trade;
 EOF
 

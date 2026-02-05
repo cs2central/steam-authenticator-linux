@@ -11,13 +11,24 @@ class MaFileManager:
     
     def __init__(self, mafiles_dir: Optional[Path] = None):
         if mafiles_dir is None:
-            # Default to src/maFiles directory
+            # Default to src/maFiles directory (works for git-clone installs)
             src_dir = Path(__file__).parent
-            self.mafiles_dir = src_dir / "maFiles"
+            default_dir = src_dir / "maFiles"
+            try:
+                default_dir.mkdir(parents=True, exist_ok=True)
+                # Verify we can actually write here (read-only in Flatpak)
+                test_file = default_dir / ".write_test"
+                test_file.touch()
+                test_file.unlink()
+                self.mafiles_dir = default_dir
+            except (PermissionError, OSError):
+                # Fall back to XDG data directory (Flatpak, system installs)
+                self.mafiles_dir = Path.home() / ".local" / "share" / "steam-authenticator" / "maFiles"
+                self.mafiles_dir.mkdir(parents=True, exist_ok=True)
         else:
             self.mafiles_dir = Path(mafiles_dir)
-        
-        self.mafiles_dir.mkdir(parents=True, exist_ok=True)
+            self.mafiles_dir.mkdir(parents=True, exist_ok=True)
+
         logging.info(f"Using maFiles directory: {self.mafiles_dir}")
     
     def scan_mafiles(self) -> List[SteamGuardAccount]:

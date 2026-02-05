@@ -1,6 +1,6 @@
 [project]
 name = "steam-authenticator-linux"
-version = "0.1.0"
+version = "1.0.0"
 description = "A modern Steam Authenticator for Linux with 2FA and trade confirmations"
 requires-python = ">=3.10"
 dependencies = [
@@ -10,6 +10,7 @@ dependencies = [
     "aiohttp>=3.9.0",
     "qrcode[pil]>=7.4.0",
     "Pillow>=10.0.0",
+    "argon2-cffi>=23.1.0",
 ]
 
 [project.scripts]

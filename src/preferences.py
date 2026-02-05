@@ -18,7 +18,8 @@ class PreferencesManager:
         self.defaults = {
             "theme": "light",  # light, dark, crimson
             "font_size": "large",  # small, medium, large, extra-large
-            "show_countdown": True
+            "show_countdown": True,
+            "steam_api_key": "",  # Steam Web API key for profile data
         }
         
         self.settings = self.load_preferences()
@@ -136,6 +137,52 @@ class PreferencesWindow(Adw.PreferencesWindow):
         countdown_row.connect("notify::active", lambda row, _:
                               self.prefs.set("show_countdown", row.get_active()))
         appearance_group.add(countdown_row)
+
+        # Steam API group
+        api_group = Adw.PreferencesGroup()
+        api_group.set_title("Steam Web API")
+        api_group.set_description("Configure Steam API for profile pictures and data")
+        general_page.add(api_group)
+
+        # API Key row with edit/save functionality
+        self.api_key_row = Adw.ActionRow()
+        self.api_key_row.set_title("API Key")
+        self.api_key_editing = False
+
+        # Entry for editing (hidden by default)
+        self.api_key_entry = Gtk.Entry()
+        self.api_key_entry.set_visibility(False)  # Password-style
+        self.api_key_entry.set_hexpand(True)
+        self.api_key_entry.set_valign(Gtk.Align.CENTER)
+        self.api_key_entry.set_visible(False)
+
+        # Label showing masked key (visible by default)
+        self.api_key_label = Gtk.Label()
+        self.api_key_label.set_hexpand(True)
+        self.api_key_label.set_xalign(0)
+        self.api_key_label.add_css_class("dim-label")
+
+        # Edit/Save button
+        self.api_key_button = Gtk.Button()
+        self.api_key_button.set_valign(Gtk.Align.CENTER)
+        self.api_key_button.connect("clicked", self.on_api_key_button_clicked)
+
+        self.api_key_row.add_suffix(self.api_key_label)
+        self.api_key_row.add_suffix(self.api_key_entry)
+        self.api_key_row.add_suffix(self.api_key_button)
+        api_group.add(self.api_key_row)
+
+        # Initialize display state
+        self._update_api_key_display()
+
+        # Get API key link
+        api_link_row = Adw.ActionRow()
+        api_link_row.set_title("Get Steam API Key")
+        api_link_row.set_subtitle("Open Steam to create an API key")
+        api_link_row.add_suffix(Gtk.Image.new_from_icon_name("globe-symbolic"))
+        api_link_row.set_activatable(True)
+        api_link_row.connect("activated", self.on_get_api_key_clicked)
+        api_group.add(api_link_row)
     
     def apply_theme_via_app(self, theme_name):
         """Apply the selected theme via the main application"""
@@ -228,8 +275,65 @@ class PreferencesWindow(Adw.PreferencesWindow):
     def apply_font_size(self, font_size):
         """Apply the selected font size"""
         self.prefs.set("font_size", font_size)
-        
+
         # Get the main application window to update font
         app = self.get_transient_for().get_application()
         if app and hasattr(app, 'main_window'):
             app.main_window.update_code_font_size(font_size)
+
+    def _update_api_key_display(self):
+        """Update the API key row display based on current state"""
+        current_key = self.prefs.get("steam_api_key", "")
+
+        if self.api_key_editing:
+            # Show entry, hide label
+            self.api_key_label.set_visible(False)
+            self.api_key_entry.set_visible(True)
+            self.api_key_entry.set_text(current_key)
+            self.api_key_entry.grab_focus()
+            self.api_key_button.set_icon_name("emblem-ok-symbolic")
+            self.api_key_button.set_tooltip_text("Save")
+            self.api_key_button.add_css_class("suggested-action")
+        else:
+            # Show label, hide entry
+            self.api_key_entry.set_visible(False)
+            self.api_key_label.set_visible(True)
+
+            if current_key:
+                # Show masked key
+                masked = current_key[:4] + "•" * 20 + current_key[-4:] if len(current_key) > 8 else "•" * len(current_key)
+                self.api_key_label.set_text(masked)
+                self.api_key_row.set_subtitle("Saved")
+            else:
+                self.api_key_label.set_text("Not configured")
+                self.api_key_row.set_subtitle("Click Edit to add your API key")
+
+            self.api_key_button.set_icon_name("document-edit-symbolic")
+            self.api_key_button.set_tooltip_text("Edit")
+            self.api_key_button.remove_css_class("suggested-action")
+
+    def on_api_key_button_clicked(self, button):
+        """Handle Edit/Save button click"""
+        if self.api_key_editing:
+            # Save the key
+            new_key = self.api_key_entry.get_text().strip()
+            self.prefs.set("steam_api_key", new_key)
+            self.api_key_editing = False
+            self._update_api_key_display()
+
+            # Show feedback
+            parent = self.get_transient_for()
+            if parent and hasattr(parent, 'show_toast'):
+                if new_key:
+                    parent.show_toast("API key saved")
+                else:
+                    parent.show_toast("API key removed")
+        else:
+            # Enter edit mode
+            self.api_key_editing = True
+            self._update_api_key_display()
+
+    def on_get_api_key_clicked(self, row):
+        """Open Steam API key registration page"""
+        import subprocess
+        subprocess.Popen(["xdg-open", "https://steamcommunity.com/dev/apikey"])

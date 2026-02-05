@@ -120,10 +120,30 @@ python3 -m venv --system-site-packages venv
 </details>
 
 <details>
-<summary><b>Flatpak (Universal)</b></summary>
+<summary><b>Flatpak (Build from source)</b></summary>
+
+The app is not yet on Flathub. You can build and install it locally:
 
 ```bash
-flatpak install flathub gg.cs2central.SteamAuthenticator
+# Install Flatpak builder and the GNOME 47 runtime/SDK
+sudo apt install flatpak-builder  # or equivalent for your distro
+flatpak install flathub org.gnome.Platform//47 org.gnome.Sdk//47
+
+# Clone the repository
+git clone https://github.com/cs2central/steam-authenticator-linux.git
+cd steam-authenticator-linux
+
+# Generate Python dependency manifests
+pip install flatpak-pip-generator
+flatpak-pip-generator -r packaging/flatpak/requirements-flatpak.txt \
+    -o packaging/flatpak/python3-dependencies
+
+# Build and install
+flatpak-builder --force-clean build-dir packaging/flatpak/gg.cs2central.SteamAuthenticator.yml
+flatpak-builder --user --install --force-clean build-dir packaging/flatpak/gg.cs2central.SteamAuthenticator.yml
+
+# Run
+flatpak run gg.cs2central.SteamAuthenticator
 ```
 
 </details>
@@ -187,9 +207,39 @@ Access via **Menu → Preferences → Appearance**
 
 | Data | Location |
 |------|----------|
-| Account Files | `./src/maFiles/` or `~/.local/share/steam-authenticator/` |
+| Account Files | `./src/maFiles/` (git clone) or `~/.local/share/steam-authenticator/maFiles/` (Flatpak/system) |
 | Preferences | `~/.config/steam-authenticator/preferences.json` |
-| Logs | `./steam_authenticator.log` |
+| Logs | `~/.local/share/steam-authenticator/steam_authenticator.log` |
+
+## Uninstalling
+
+### Quick Install / Manual Install
+
+```bash
+# Remove desktop entry and icons
+rm -f ~/.local/share/applications/gg.cs2central.SteamAuthenticator.desktop
+rm -f ~/.local/share/icons/hicolor/256x256/apps/gg.cs2central.SteamAuthenticator.png
+rm -f ~/.local/share/icons/hicolor/scalable/apps/gg.cs2central.SteamAuthenticator.svg
+
+# Remove the cloned repository
+rm -rf /path/to/steam-authenticator-linux
+
+# Optionally remove config and data
+rm -rf ~/.config/steam-authenticator
+rm -rf ~/.local/share/steam-authenticator
+```
+
+### Flatpak
+
+```bash
+flatpak uninstall gg.cs2central.SteamAuthenticator
+```
+
+### AUR
+
+```bash
+sudo pacman -R steam-authenticator-linux
+```
 
 ## Building from Source
 

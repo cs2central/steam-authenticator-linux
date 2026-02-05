@@ -23,12 +23,14 @@ from preferences import PreferencesManager, PreferencesWindow
 from setup_dialog import SetupDialog
 
 # Set up logging
+_log_dir = Path.home() / ".local" / "share" / "steam-authenticator"
+_log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('steam_authenticator.log')
+        logging.FileHandler(_log_dir / 'steam_authenticator.log')
     ]
 )
 
@@ -36,7 +38,7 @@ logging.basicConfig(
 class SteamAuthenticatorApp(Adw.Application):
     def __init__(self):
         super().__init__(
-            application_id='com.github.steamauthenticator',
+            application_id='gg.cs2central.SteamAuthenticator',
             flags=Gio.ApplicationFlags.DEFAULT_FLAGS
         )
         self.mafile_manager = MaFileManager()
@@ -67,6 +69,8 @@ class SteamAuthenticatorApp(Adw.Application):
         self.create_action('refresh_token', self.on_refresh_token_action)
         self.create_action('steam_login', self.on_steam_login_action)
         self.create_action('relogin', self.on_relogin_action)
+        self.create_action('refresh_profile', self.on_refresh_profile_action)
+        self.create_action('show_import_export', self.on_show_import_export_action)
         
     def do_activate(self):
         if not self.main_window:
@@ -136,7 +140,7 @@ class SteamAuthenticatorApp(Adw.Application):
         about = Adw.AboutWindow(
             transient_for=self.main_window,
             application_name='Steam Authenticator',
-            application_icon='steam-authenticator',
+            application_icon='gg.cs2central.SteamAuthenticator',
             developer_name='zorex',
             version='1.0.0',
             developers=['zorex'],
@@ -159,6 +163,13 @@ class SteamAuthenticatorApp(Adw.Application):
         # Show add account dialog
         if self.main_window:
             self.main_window.show_add_account_dialog()
+
+    def on_show_import_export_action(self, action, param):
+        """Show import/export dialog"""
+        if self.main_window:
+            from ui import ImportExportDialog
+            dialog = ImportExportDialog(self.main_window)
+            dialog.present()
 
     def on_setup_account_action(self, action, param):
         """Show setup dialog to link a new Steam account"""
@@ -550,6 +561,80 @@ class SteamAuthenticatorApp(Adw.Application):
     def on_relogin_action(self, action, param):
         """Legacy action - redirect to steam_login"""
         self.on_steam_login_action(action, param)
+
+    def on_refresh_profile_action(self, action, param):
+        """Refresh profile data from Steam Web API"""
+        if not self.current_account:
+            self.main_window.show_toast("No account selected")
+            return
+
+        if not self.current_account.steamid:
+            self.main_window.show_toast("Account has no Steam ID - login first")
+            return
+
+        api_key = self.preferences.get("steam_api_key", "")
+        if not api_key:
+            self.main_window.show_toast("Steam API key not configured - check Preferences")
+            return
+
+        # Run refresh in background
+        def refresh_thread():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def do_refresh():
+                from steam_web_api import SteamWebAPI
+                async with SteamWebAPI(api_key) as api:
+                    data = await api.fetch_all_player_data(self.current_account.steamid)
+
+                    if data["summary"]:
+                        self.current_account.display_name = data["summary"].get("display_name", "")
+                        self.current_account.avatar_url = data["summary"].get("avatar_url", "")
+                        self.current_account.profile_visibility = data["summary"].get("visibility", 0)
+
+                    if data["games"]:
+                        self.current_account.total_games = len(data["games"])
+
+                    if data["bans"]:
+                        self.current_account.vac_banned = data["bans"].get("vac_banned", False)
+                        self.current_account.trade_banned = data["bans"].get("trade_banned", False)
+                        self.current_account.game_bans = data["bans"].get("game_bans", 0)
+
+                    # Update last refresh timestamp
+                    self.current_account.last_api_refresh = datetime.now().isoformat()
+
+                    # Save updated account
+                    self.mafile_manager.save_mafile(self.current_account)
+
+                    return data["summary"] is not None
+
+            try:
+                success = loop.run_until_complete(do_refresh())
+                GLib.idle_add(self.handle_profile_refresh_result, success)
+            except Exception as e:
+                logging.error(f"Profile refresh error: {e}")
+                GLib.idle_add(self.handle_profile_refresh_result, False)
+            finally:
+                loop.close()
+
+        thread = threading.Thread(target=refresh_thread)
+        thread.daemon = True
+        thread.start()
+
+        self.main_window.show_toast("Refreshing profile data...")
+
+    def handle_profile_refresh_result(self, success):
+        """Handle profile refresh result"""
+        if success:
+            # Update UI with new data
+            self.main_window.set_current_account(self.current_account)
+            self.main_window.show_toast(f"Profile updated: {self.current_account.display_name or self.current_account.account_name}")
+            logging.info(f"Successfully refreshed profile for {self.current_account.account_name}")
+        else:
+            self.main_window.show_toast("Could not refresh profile. Check API key.")
+            logging.warning("Profile refresh failed")
+
+        return False
     
     def handle_steam_login_success(self, login_result):
         """Handle successful Steam login with fresh tokens"""
@@ -571,9 +656,12 @@ class SteamAuthenticatorApp(Adw.Application):
             # Save updated account
             self.mafile_manager.save_mafile(self.current_account)
             
-            self.main_window.show_toast("✅ Fresh Steam session created! Trade confirmations should work now.")
+            self.main_window.show_toast("Fresh Steam session created!")
             logging.info(f"Successfully created fresh Steam session for {self.current_account.account_name}")
-            
+
+            # Auto-refresh profile data
+            self.on_refresh_profile_action(None, None)
+
         except Exception as e:
             logging.error(f"Error updating account with fresh tokens: {e}")
             self.main_window.show_toast("Could not save session. Please try again.")
