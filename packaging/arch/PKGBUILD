@@ -42,7 +42,7 @@ EOF
     chmod 755 "$pkgdir/usr/bin/steam-authenticator"
 
     # Install desktop file
-    install -Dm644 packaging/flatpak/gg.cs2central.SteamAuthenticator.desktop \
+    install -Dm644 packaging/desktop/gg.cs2central.SteamAuthenticator.desktop \
         "$pkgdir/usr/share/applications/gg.cs2central.SteamAuthenticator.desktop"
 
     # Update desktop file Exec path
