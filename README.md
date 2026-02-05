@@ -80,11 +80,6 @@ python -m venv --system-site-packages venv
 ./run.sh
 ```
 
-**AUR:**
-```bash
-yay -S steam-authenticator-linux
-```
-
 </details>
 
 <details>
@@ -199,12 +194,6 @@ rm -rf /path/to/steam-authenticator-linux
 # Optionally remove config and data
 rm -rf ~/.config/steam-authenticator
 rm -rf ~/.local/share/steam-authenticator
-```
-
-### AUR
-
-```bash
-sudo pacman -R steam-authenticator-linux
 ```
 
 ## Building from Source
