@@ -21,6 +21,7 @@ from mafile_manager import MaFileManager
 from login_dialog import LoginDialog
 from preferences import PreferencesManager, PreferencesWindow
 from setup_dialog import SetupDialog
+from sda_compat import is_sda_folder, read_sda_manifest, verify_sda_passkey, export_sda_accounts, import_sda_accounts
 
 # Set up logging
 _log_dir = Path.home() / ".local" / "share" / "steam-authenticator"
@@ -66,6 +67,9 @@ class SteamAuthenticatorApp(Adw.Application):
         self.create_action('export_account', self.on_export_account_action)
         self.create_action('backup_all', self.on_backup_all_action)
         self.create_action('restore_backup', self.on_restore_backup_action)
+        self.create_action('export_encrypted', self.on_export_encrypted_action)
+        self.create_action('import_encrypted', self.on_import_encrypted_action)
+        self.create_action('export_folder', self.on_export_folder_action)
         self.create_action('refresh_token', self.on_refresh_token_action)
         self.create_action('steam_login', self.on_steam_login_action)
         self.create_action('relogin', self.on_relogin_action)
@@ -253,6 +257,12 @@ class SteamAuthenticatorApp(Adw.Application):
             if file:
                 source_path = Path(file.get_path())
 
+                # Check if file appears to be encrypted (not valid JSON)
+                validation = self.mafile_manager.validate_mafile_format(source_path)
+                if validation.get("encrypted"):
+                    self.main_window.show_toast("This file is encrypted. Use 'Import Folder' on the SDA maFiles folder instead.")
+                    return
+
                 # Import the maFile
                 account = self.mafile_manager.import_mafile(source_path)
                 if account:
@@ -286,7 +296,15 @@ class SteamAuthenticatorApp(Adw.Application):
             if folder:
                 folder_path = Path(folder.get_path())
 
-                # Import all maFiles from the folder
+                # Check if this is an encrypted SDA folder
+                if is_sda_folder(folder_path):
+                    manifest = read_sda_manifest(folder_path)
+                    if manifest and manifest.get("encrypted", False):
+                        # Show passkey dialog
+                        self._show_sda_passkey_dialog(folder_path)
+                        return
+
+                # Import all maFiles from the folder (handles SDA unencrypted + plain maFiles)
                 imported_accounts = self.mafile_manager.import_mafiles_from_folder(folder_path)
 
                 if imported_accounts:
@@ -309,7 +327,349 @@ class SteamAuthenticatorApp(Adw.Application):
         except Exception as e:
             logging.error(f"Import folder error: {e}")
             self.main_window.show_toast("Could not import folder. Please try again.")
+
+    def _show_sda_passkey_dialog(self, folder_path: Path):
+        """Show a dialog to enter SDA encryption passkey."""
+        dialog = Adw.MessageDialog(
+            transient_for=self.main_window,
+            heading="Encrypted SDA Folder",
+            body="This folder contains encrypted Steam Desktop Authenticator files. Enter the encryption passkey to import them.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("import", "Import")
+        dialog.set_response_appearance("import", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("import")
+        dialog.set_close_response("cancel")
+
+        # Add passkey entry
+        entry = Gtk.PasswordEntry()
+        entry.set_show_peek_icon(True)
+        entry.props.placeholder_text = "SDA Encryption Passkey"
+        entry.set_hexpand(True)
+        entry.add_css_class("card")
+        entry.set_margin_start(24)
+        entry.set_margin_end(24)
+        entry.set_margin_top(8)
+
+        # Allow Enter key to submit
+        entry.connect("activate", lambda _: dialog.response("import"))
+
+        dialog.set_extra_child(entry)
+
+        dialog.connect("response", self._on_sda_passkey_response, folder_path, entry)
+        dialog.present()
+        entry.grab_focus()
+
+    def _on_sda_passkey_response(self, dialog, response, folder_path, entry):
+        """Handle SDA passkey dialog response."""
+        if response != "import":
+            return
+
+        passkey = entry.get_text().strip()
+        if not passkey:
+            self.main_window.show_toast("Passkey cannot be empty")
+            return
+
+        # Verify passkey first
+        if not verify_sda_passkey(folder_path, passkey):
+            self.main_window.show_toast("Invalid passkey. Please check and try again.")
+            return
+
+        # Import with passkey
+        try:
+            imported, errors = self.mafile_manager.import_sda_folder(folder_path, passkey)
+
+            if imported:
+                self.load_accounts()
+                self.main_window.set_accounts(self.accounts)
+
+                self.current_account = imported[0]
+                self.main_window.set_current_account(self.current_account)
+
+                msg = f"Imported {len(imported)} accounts"
+                if errors:
+                    msg += f" ({len(errors)} errors)"
+                self.main_window.show_toast(msg)
+            else:
+                error_msg = errors[0] if errors else "Unknown error"
+                self.main_window.show_toast(f"Import failed: {error_msg}")
+
+        except Exception as e:
+            logging.error(f"SDA import error: {e}")
+            self.main_window.show_toast("Could not import encrypted folder. Please try again.")
     
+    def on_export_encrypted_action(self, action, param):
+        """Export all accounts as maFiles ZIP (optionally encrypted)"""
+        if not self.accounts:
+            self.main_window.show_toast("No accounts to export")
+            return
+
+        # Show passkey dialog
+        dialog = Adw.MessageDialog(
+            transient_for=self.main_window,
+            heading="Export Backup",
+            body="Enter a passkey to encrypt the backup. Leave blank to export without encryption.\n\nCompatible with Hour Boost.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("export", "Export")
+        dialog.set_response_appearance("export", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("export")
+        dialog.set_close_response("cancel")
+
+        entry = Gtk.PasswordEntry()
+        entry.set_show_peek_icon(True)
+        entry.props.placeholder_text = "Passkey"
+        entry.set_hexpand(True)
+        entry.add_css_class("card")
+        entry.set_margin_start(24)
+        entry.set_margin_end(24)
+        entry.set_margin_top(8)
+        entry.connect("activate", lambda _: dialog.response("export"))
+
+        dialog.set_extra_child(entry)
+        dialog.connect("response", self._on_export_encrypted_passkey_response, entry)
+        dialog.present()
+        entry.grab_focus()
+
+    def _on_export_encrypted_passkey_response(self, dialog, response, entry):
+        """Handle passkey entry for export, then show file save dialog"""
+        if response != "export":
+            return
+
+        passkey = entry.get_text().strip()
+        # Empty passkey = plaintext export, non-empty = encrypted
+        self._export_passkey = passkey if passkey else None
+
+        suffix = "encrypted-" if passkey else ""
+        file_dialog = Gtk.FileDialog()
+        file_dialog.set_title("Save Backup")
+        file_dialog.set_initial_name(f"maFiles-{suffix}{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+        file_dialog.save(self.main_window, None, self._on_export_encrypted_file_selected)
+
+    def _on_export_encrypted_file_selected(self, dialog, result):
+        """Save encrypted maFiles ZIP to selected path"""
+        try:
+            file = dialog.save_finish(result)
+            if not file:
+                return
+
+            import zipfile
+            dest_path = Path(file.get_path())
+            passkey = getattr(self, '_export_passkey', None)
+            if hasattr(self, '_export_passkey'):
+                del self._export_passkey
+
+            # Build account dicts
+            account_dicts = [account.to_dict() for account in self.accounts]
+
+            # Export using SDA-compatible encryption
+            manifest, files = export_sda_accounts(account_dicts, passkey)
+
+            with zipfile.ZipFile(dest_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                zipf.writestr("manifest.json", json.dumps(manifest, indent=2))
+                for filename, content in files.items():
+                    zipf.writestr(filename, content)
+
+            label = "Encrypted backup" if passkey else "Backup"
+            self.main_window.show_toast(f"{label} saved - {len(files)} accounts")
+            logging.info(f"Exported {len(files)} accounts as {'encrypted ' if passkey else ''}maFiles to {dest_path}")
+
+        except GLib.Error as e:
+            if e.code == Gio.IOErrorEnum.CANCELLED or "Dismissed" in str(e):
+                return
+            self.main_window.show_toast("Could not save encrypted backup. Please try again.")
+        except Exception as e:
+            logging.error(f"Encrypted export error: {e}")
+            self.main_window.show_toast("Could not save encrypted backup. Please try again.")
+
+    def on_import_encrypted_action(self, action, param):
+        """Import encrypted SDA-compatible maFiles ZIP"""
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Import Encrypted Backup")
+
+        filter_zip = Gtk.FileFilter()
+        filter_zip.set_name("Encrypted Backup (*.zip)")
+        filter_zip.add_pattern("*.zip")
+
+        filter_all = Gtk.FileFilter()
+        filter_all.set_name("All Files")
+        filter_all.add_pattern("*")
+
+        filters = Gio.ListStore()
+        filters.append(filter_zip)
+        filters.append(filter_all)
+        dialog.set_filters(filters)
+
+        dialog.open(self.main_window, None, self._on_import_encrypted_file_selected)
+
+    def _on_import_encrypted_file_selected(self, dialog, result):
+        """Handle encrypted ZIP file selection"""
+        try:
+            file = dialog.open_finish(result)
+            if not file:
+                return
+
+            import zipfile
+            source_path = Path(file.get_path())
+
+            # Verify it's a valid SDA-format ZIP (has manifest.json)
+            try:
+                with zipfile.ZipFile(source_path, 'r') as zipf:
+                    if 'manifest.json' not in zipf.namelist():
+                        self.main_window.show_toast("Not a valid encrypted backup (no manifest.json)")
+                        return
+                    manifest = json.loads(zipf.read('manifest.json').decode('utf-8'))
+            except zipfile.BadZipFile:
+                self.main_window.show_toast("Invalid ZIP file")
+                return
+
+            if not manifest.get("entries"):
+                self.main_window.show_toast("No accounts found in backup")
+                return
+
+            if manifest.get("encrypted", False):
+                # Show passkey dialog
+                self._import_encrypted_zip_path = source_path
+                self._show_import_encrypted_passkey_dialog()
+            else:
+                # Not encrypted, import directly
+                self._do_import_encrypted_zip(source_path, None)
+
+        except GLib.Error as e:
+            if e.code == Gio.IOErrorEnum.CANCELLED or "Dismissed" in str(e):
+                return
+            self.main_window.show_toast("Could not import backup. Please try again.")
+        except Exception as e:
+            logging.error(f"Import encrypted error: {e}")
+            self.main_window.show_toast("Could not import backup. Please try again.")
+
+    def _show_import_encrypted_passkey_dialog(self):
+        """Show passkey dialog for importing encrypted backup"""
+        dialog = Adw.MessageDialog(
+            transient_for=self.main_window,
+            heading="Encrypted Backup",
+            body="This backup is encrypted. Enter the passkey used when exporting.",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("import", "Import")
+        dialog.set_response_appearance("import", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("import")
+        dialog.set_close_response("cancel")
+
+        entry = Gtk.PasswordEntry()
+        entry.set_show_peek_icon(True)
+        entry.props.placeholder_text = "Decryption Passkey"
+        entry.set_hexpand(True)
+        entry.add_css_class("card")
+        entry.set_margin_start(24)
+        entry.set_margin_end(24)
+        entry.set_margin_top(8)
+        entry.connect("activate", lambda _: dialog.response("import"))
+
+        dialog.set_extra_child(entry)
+        dialog.connect("response", self._on_import_encrypted_passkey_response, entry)
+        dialog.present()
+        entry.grab_focus()
+
+    def _on_import_encrypted_passkey_response(self, dialog, response, entry):
+        """Handle passkey entry for encrypted import"""
+        if response != "import":
+            if hasattr(self, '_import_encrypted_zip_path'):
+                del self._import_encrypted_zip_path
+            return
+
+        passkey = entry.get_text().strip()
+        if not passkey:
+            self.main_window.show_toast("Passkey cannot be empty")
+            return
+
+        source_path = self._import_encrypted_zip_path
+        del self._import_encrypted_zip_path
+
+        self._do_import_encrypted_zip(source_path, passkey)
+
+    def _do_import_encrypted_zip(self, source_path: Path, passkey):
+        """Actually import accounts from an SDA-format ZIP"""
+        import zipfile
+        import tempfile
+
+        try:
+            # Extract ZIP to temp dir, then use import_sda_accounts
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmpdir_path = Path(tmpdir)
+                with zipfile.ZipFile(source_path, 'r') as zipf:
+                    zipf.extractall(tmpdir)
+
+                accounts, errors = import_sda_accounts(tmpdir_path, passkey)
+
+                if not accounts and errors:
+                    error_msg = errors[0] if errors else "Unknown error"
+                    self.main_window.show_toast(f"Import failed: {error_msg}")
+                    return
+
+                imported = []
+                for account_data in accounts:
+                    try:
+                        account = SteamGuardAccount(account_data)
+                        self.mafile_manager.save_mafile(account)
+                        imported.append(account)
+                    except Exception as e:
+                        name = account_data.get("account_name", "unknown")
+                        errors.append(f"Failed to save {name}: {e}")
+
+                if imported:
+                    self.load_accounts()
+                    self.main_window.set_accounts(self.accounts)
+                    self.current_account = imported[0]
+                    self.main_window.set_current_account(self.current_account)
+
+                    msg = f"Imported {len(imported)} accounts"
+                    if errors:
+                        msg += f" ({len(errors)} errors)"
+                    self.main_window.show_toast(msg)
+                else:
+                    self.main_window.show_toast("No accounts could be imported")
+
+        except Exception as e:
+            logging.error(f"Import encrypted ZIP error: {e}")
+            self.main_window.show_toast("Could not import backup. Check the passkey and try again.")
+
+    def on_export_folder_action(self, action, param):
+        """Export all accounts as plaintext .maFile files to a folder"""
+        if not self.accounts:
+            self.main_window.show_toast("No accounts to export")
+            return
+
+        dialog = Gtk.FileDialog()
+        dialog.set_title("Export maFiles to Folder")
+        dialog.select_folder(self.main_window, None, self._on_export_folder_selected)
+
+    def _on_export_folder_selected(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result)
+            if not folder:
+                return
+
+            dest_path = Path(folder.get_path())
+            count = 0
+            for account in self.accounts:
+                filename = f"{account.steamid or account.account_name}.maFile"
+                file_path = dest_path / filename
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(account.to_dict(), f, indent=2)
+                count += 1
+
+            self.main_window.show_toast(f"Exported {count} accounts to folder")
+            logging.info(f"Exported {count} accounts as plaintext maFiles to {dest_path}")
+
+        except GLib.Error as e:
+            if e.code == Gio.IOErrorEnum.CANCELLED or "Dismissed" in str(e):
+                return
+            self.main_window.show_toast("Could not export to folder. Please try again.")
+        except Exception as e:
+            logging.error(f"Export folder error: {e}")
+            self.main_window.show_toast("Could not export to folder. Please try again.")
+
     def on_export_account_action(self, action, param):
         if not self.current_account:
             return

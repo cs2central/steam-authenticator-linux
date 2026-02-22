@@ -1,9 +1,10 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import logging
 from steam_guard import SteamGuardAccount
+from sda_compat import is_sda_folder, import_sda_accounts, verify_sda_passkey
 
 
 class MaFileManager:
@@ -178,14 +179,54 @@ class MaFileManager:
         
         return safe_name
     
-    def import_mafiles_from_folder(self, folder_path: Path) -> List[SteamGuardAccount]:
-        """Import all .maFile files from a folder"""
+    def import_sda_folder(self, folder_path: Path, passkey: Optional[str] = None) -> Tuple[List[SteamGuardAccount], List[str]]:
+        """
+        Import accounts from an SDA (Steam Desktop Authenticator) maFiles folder.
+        Handles both encrypted and unencrypted SDA maFiles.
+        Decryption happens in memory — no plaintext secrets written to disk.
+
+        Args:
+            folder_path: Path to SDA maFiles directory (containing manifest.json)
+            passkey: SDA encryption passkey (required if manifest says encrypted)
+
+        Returns:
+            Tuple of (imported accounts list, error messages list)
+        """
+        folder_path = Path(folder_path)
+        accounts, errors = import_sda_accounts(folder_path, passkey)
+
+        imported = []
+        for account_data in accounts:
+            try:
+                account = SteamGuardAccount(account_data)
+                # Save to our maFiles directory
+                self.save_mafile(account)
+                imported.append(account)
+                logging.info(f"Imported SDA account: {account.account_name}")
+            except Exception as e:
+                name = account_data.get("account_name", "unknown")
+                errors.append(f"Failed to save {name}: {e}")
+                logging.error(f"Failed to save SDA account {name}: {e}")
+
+        logging.info(f"Imported {len(imported)} SDA accounts, {len(errors)} errors")
+        return imported, errors
+
+    def import_mafiles_from_folder(self, folder_path: Path, passkey: Optional[str] = None) -> List[SteamGuardAccount]:
+        """Import all .maFile files from a folder. Auto-detects SDA folders."""
         imported = []
         folder_path = Path(folder_path)
 
         if not folder_path.exists() or not folder_path.is_dir():
             logging.error(f"Invalid folder path: {folder_path}")
             return imported
+
+        # Auto-detect SDA folder (has manifest.json with entries array)
+        if is_sda_folder(folder_path):
+            logging.info("Detected SDA folder format, using SDA import")
+            sda_imported, sda_errors = self.import_sda_folder(folder_path, passkey)
+            for err in sda_errors:
+                logging.warning(f"SDA import issue: {err}")
+            return sda_imported
 
         # Find all .maFile files (case insensitive)
         mafiles = list(folder_path.glob("*.maFile")) + list(folder_path.glob("*.mafile"))
@@ -211,35 +252,49 @@ class MaFileManager:
             "errors": [],
             "warnings": [],
             "account_name": None,
-            "steam_id": None
+            "steam_id": None,
+            "encrypted": False
         }
-        
+
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
+                content = f.read().strip()
+
+            # Detect if file is SDA-encrypted (base64-encoded, not JSON)
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError:
+                # Could be SDA-encrypted (base64 ciphertext)
+                try:
+                    import base64
+                    base64.b64decode(content)
+                    result["encrypted"] = True
+                    result["warnings"].append("File appears to be SDA-encrypted. Import via SDA folder with passkey.")
+                    return result
+                except Exception:
+                    result["errors"].append("Invalid file format: not JSON and not encrypted")
+                    return result
+
             # Check required fields
             required_fields = ['account_name', 'shared_secret']
             for field in required_fields:
                 if field not in data:
                     result["errors"].append(f"Missing required field: {field}")
-            
+
             # Check recommended fields
             recommended_fields = ['identity_secret', 'steamid']
             for field in recommended_fields:
                 if field not in data:
                     result["warnings"].append(f"Missing recommended field: {field} (needed for confirmations)")
-            
+
             # Extract account info
             result["account_name"] = data.get("account_name")
             result["steam_id"] = data.get("steamid") or data.get("SteamID")
-            
+
             # Check if valid
             result["valid"] = len(result["errors"]) == 0
-            
-        except json.JSONDecodeError as e:
-            result["errors"].append(f"Invalid JSON: {e}")
+
         except Exception as e:
             result["errors"].append(f"Error reading file: {e}")
-        
+
         return result

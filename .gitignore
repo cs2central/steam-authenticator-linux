@@ -45,3 +45,16 @@ steam-hour-boost/
 # OS
 .DS_Store
 Thumbs.db
+
+# Sensitive exports
+*-backup-*.json
+maFiles-*.zip
+*.maFile
+
+# Claude
+CLAUDE.md
+.claude/
+
+# Data
+*.db
+data/

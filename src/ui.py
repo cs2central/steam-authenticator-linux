@@ -1088,14 +1088,14 @@ class ImportExportDialog(Adw.Window):
         import_folder_row.connect("activated", self.on_import_folder)
         import_group.add(import_folder_row)
 
-        # Restore backup
-        restore_row = Adw.ActionRow()
-        restore_row.set_title("Restore Backup")
-        restore_row.set_subtitle("Restore accounts from a .zip backup")
-        restore_row.add_suffix(Gtk.Image.new_from_icon_name("document-open-symbolic"))
-        restore_row.set_activatable(True)
-        restore_row.connect("activated", self.on_restore_backup)
-        import_group.add(restore_row)
+        # Import backup (.zip)
+        import_backup_row = Adw.ActionRow()
+        import_backup_row.set_title("Import Backup")
+        import_backup_row.set_subtitle("Import .zip backup (encrypted or plaintext)")
+        import_backup_row.add_suffix(Gtk.Image.new_from_icon_name("document-open-symbolic"))
+        import_backup_row.set_activatable(True)
+        import_backup_row.connect("activated", self.on_import_encrypted)
+        import_group.add(import_backup_row)
 
         # Export section
         export_group = Adw.PreferencesGroup()
@@ -1112,14 +1112,23 @@ class ImportExportDialog(Adw.Window):
         export_row.connect("activated", self.on_export_account)
         export_group.add(export_row)
 
-        # Backup all
-        backup_row = Adw.ActionRow()
-        backup_row.set_title("Backup All Accounts")
-        backup_row.set_subtitle("Save all accounts to a .zip file")
-        backup_row.add_suffix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
-        backup_row.set_activatable(True)
-        backup_row.connect("activated", self.on_backup_all)
-        export_group.add(backup_row)
+        # Export folder (plaintext)
+        export_folder_row = Adw.ActionRow()
+        export_folder_row.set_title("Export Folder")
+        export_folder_row.set_subtitle("Export all accounts as plaintext .maFiles to a folder")
+        export_folder_row.add_suffix(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
+        export_folder_row.set_activatable(True)
+        export_folder_row.connect("activated", self.on_export_folder)
+        export_group.add(export_folder_row)
+
+        # Export backup (optionally encrypted)
+        export_backup_row = Adw.ActionRow()
+        export_backup_row.set_title("Export Backup")
+        export_backup_row.set_subtitle("Export all accounts as .zip (optionally encrypted)")
+        export_backup_row.add_suffix(Gtk.Image.new_from_icon_name("drive-harddisk-symbolic"))
+        export_backup_row.set_activatable(True)
+        export_backup_row.connect("activated", self.on_export_encrypted)
+        export_group.add(export_backup_row)
 
     def on_import_account(self, row):
         self.close()
@@ -1141,7 +1150,17 @@ class ImportExportDialog(Adw.Window):
         if self.app:
             self.app.activate_action("export_account")
 
-    def on_backup_all(self, row):
+    def on_export_folder(self, row):
         self.close()
         if self.app:
-            self.app.activate_action("backup_all")
+            self.app.activate_action("export_folder")
+
+    def on_export_encrypted(self, row):
+        self.close()
+        if self.app:
+            self.app.activate_action("export_encrypted")
+
+    def on_import_encrypted(self, row):
+        self.close()
+        if self.app:
+            self.app.activate_action("import_encrypted")

@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 import secrets
 from datetime import datetime
-from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
@@ -28,6 +28,13 @@ class SteamGuardAccount:
             # Handle different session formats
             self.session_data = self._extract_session_data(account_data)
 
+            # SDA legacy fields (preserved for compatibility)
+            self.revocation_code = account_data.get("revocation_code", "")
+            self.serial_number = account_data.get("serial_number", "")
+            self.uri = account_data.get("uri", "")
+            self.server_time = account_data.get("server_time", "")
+            self.token_gid = account_data.get("token_gid", "")
+
             # Profile data (fetched from Steam Web API)
             self.avatar_url = account_data.get("avatar_url", "")
             self.display_name = account_data.get("display_name", "")
@@ -44,6 +51,12 @@ class SteamGuardAccount:
             self.device_id = self.generate_device_id()
             self.steamid = ""
             self.session_data = {}
+            # SDA legacy fields
+            self.revocation_code = ""
+            self.serial_number = ""
+            self.uri = ""
+            self.server_time = ""
+            self.token_gid = ""
             # Profile data defaults
             self.avatar_url = ""
             self.display_name = ""
@@ -180,7 +193,7 @@ class SteamGuardAccount:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert account to dictionary for storage"""
-        return {
+        data = {
             "account_name": self.account_name,
             "shared_secret": self.shared_secret,
             "identity_secret": self.identity_secret,
@@ -197,6 +210,18 @@ class SteamGuardAccount:
             "profile_visibility": self.profile_visibility,
             "last_api_refresh": self.last_api_refresh,
         }
+        # Include SDA legacy fields if present (for round-trip compatibility)
+        if self.revocation_code:
+            data["revocation_code"] = self.revocation_code
+        if self.serial_number:
+            data["serial_number"] = self.serial_number
+        if self.uri:
+            data["uri"] = self.uri
+        if self.server_time:
+            data["server_time"] = self.server_time
+        if self.token_gid:
+            data["token_gid"] = self.token_gid
+        return data
 
     def get_display_name_or_username(self) -> str:
         """Get display name if available, otherwise account name"""
@@ -227,43 +252,111 @@ class Manifest:
         self.accounts = []
         self.load()
     
-    def generate_encryption_key(self, password: str) -> bytes:
-        """Generate encryption key from password"""
+    @staticmethod
+    def generate_salt() -> str:
+        """Generate a cryptographically random salt (32 bytes, base64-encoded)."""
+        return base64.b64encode(secrets.token_bytes(32)).decode()
+
+    @staticmethod
+    def derive_key(password: str, salt_b64: str) -> bytes:
+        """Derive a 32-byte AES-256 key from password + salt using PBKDF2-HMAC-SHA256."""
+        salt = base64.b64decode(salt_b64)
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
-            salt=b'steam_auth_linux',  # In production, use a random salt
+            salt=salt,
+            iterations=100000,
+        )
+        return kdf.derive(password.encode())
+
+    @staticmethod
+    def encrypt_data(data: str, password: str, salt_b64: str) -> str:
+        """Encrypt data with AES-256-GCM. Returns base64(nonce + ciphertext + tag)."""
+        key = Manifest.derive_key(password, salt_b64)
+        aesgcm = AESGCM(key)
+        nonce = secrets.token_bytes(12)  # 96-bit nonce for GCM
+        ciphertext = aesgcm.encrypt(nonce, data.encode('utf-8'), None)
+        # Concatenate nonce + ciphertext (which includes the 16-byte tag)
+        return base64.b64encode(nonce + ciphertext).decode()
+
+    @staticmethod
+    def decrypt_data(encrypted_b64: str, password: str, salt_b64: str) -> str:
+        """Decrypt AES-256-GCM encrypted data. Input is base64(nonce + ciphertext + tag)."""
+        key = Manifest.derive_key(password, salt_b64)
+        raw = base64.b64decode(encrypted_b64)
+        nonce = raw[:12]
+        ciphertext = raw[12:]
+        aesgcm = AESGCM(key)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        return plaintext.decode('utf-8')
+
+    @staticmethod
+    def _legacy_derive_key(password: str) -> bytes:
+        """Legacy key derivation (fixed salt, Fernet). Used only for migration."""
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=b'steam_auth_linux',
             iterations=100000,
         )
         return base64.urlsafe_b64encode(kdf.derive(password.encode()))
+
+    @staticmethod
+    def _legacy_decrypt(encrypted_data: str, password: str) -> Optional[str]:
+        """Decrypt data encrypted with the legacy Fernet scheme. For migration only."""
+        try:
+            from cryptography.fernet import Fernet
+            key = Manifest._legacy_derive_key(password)
+            f = Fernet(key)
+            return f.decrypt(encrypted_data.encode()).decode()
+        except Exception:
+            return None
     
-    def encrypt_data(self, data: str, password: str) -> str:
-        """Encrypt data with password"""
-        key = self.generate_encryption_key(password)
-        f = Fernet(key)
-        return f.encrypt(data.encode()).decode()
-    
-    def decrypt_data(self, encrypted_data: str, password: str) -> str:
-        """Decrypt data with password"""
-        key = self.generate_encryption_key(password)
-        f = Fernet(key)
-        return f.decrypt(encrypted_data.encode()).decode()
-    
-    def load(self):
-        """Load manifest from file"""
+    def load(self, password: Optional[str] = None):
+        """Load manifest from file. If encrypted, password is required."""
         if not self.manifest_path.exists():
             self.save()
             return
-        
+
         try:
             with open(self.manifest_path, 'r') as f:
                 data = json.load(f)
-                
+
             if data.get("encrypted", False):
-                # Handle encrypted manifest
-                pass
+                if not password:
+                    # Caller must provide password to load encrypted manifest
+                    self.accounts = []
+                    return
+
+                salt = data.get("encryption_salt", "")
+                encrypted_accounts = data.get("accounts_encrypted", "")
+                legacy_accounts = data.get("accounts", [])
+
+                if encrypted_accounts and salt:
+                    # New AES-256-GCM format
+                    try:
+                        decrypted_json = self.decrypt_data(encrypted_accounts, password, salt)
+                        accounts_data = json.loads(decrypted_json)
+                        self.accounts = [SteamGuardAccount(a) for a in accounts_data]
+                        self.encryption_key = password
+                        return
+                    except Exception:
+                        pass
+
+                # Try legacy Fernet decryption for backward compatibility
+                if legacy_accounts and isinstance(legacy_accounts, str):
+                    decrypted = self._legacy_decrypt(legacy_accounts, password)
+                    if decrypted:
+                        accounts_data = json.loads(decrypted)
+                        self.accounts = [SteamGuardAccount(a) for a in accounts_data]
+                        self.encryption_key = password
+                        # Migrate to new format on next save
+                        self.save(password)
+                        return
+
+                self.accounts = []
             else:
-                # Load accounts
+                # Unencrypted — load accounts directly
                 self.accounts = []
                 for account_data in data.get("accounts", []):
                     account = SteamGuardAccount(account_data)
@@ -271,14 +364,40 @@ class Manifest:
         except Exception as e:
             print(f"Error loading manifest: {e}")
             self.accounts = []
-    
-    def save(self):
-        """Save manifest to file"""
-        data = {
-            "encrypted": False,
-            "accounts": [account.to_dict() for account in self.accounts]
-        }
-        
+
+    def save(self, password: Optional[str] = None):
+        """Save manifest to file. If password provided, encrypts account data."""
+        password = password or self.encryption_key
+
+        if password:
+            # Read existing salt or generate new one
+            salt = None
+            if self.manifest_path.exists():
+                try:
+                    with open(self.manifest_path, 'r') as f:
+                        existing = json.load(f)
+                    salt = existing.get("encryption_salt")
+                except Exception:
+                    pass
+
+            if not salt:
+                salt = self.generate_salt()
+
+            accounts_json = json.dumps([account.to_dict() for account in self.accounts])
+            encrypted = self.encrypt_data(accounts_json, password, salt)
+
+            data = {
+                "encrypted": True,
+                "encryption_salt": salt,
+                "accounts_encrypted": encrypted,
+                "accounts": []
+            }
+        else:
+            data = {
+                "encrypted": False,
+                "accounts": [account.to_dict() for account in self.accounts]
+            }
+
         with open(self.manifest_path, 'w') as f:
             json.dump(data, f, indent=2)
     
@@ -287,12 +406,12 @@ class Manifest:
         # Remove existing account with same name
         self.accounts = [a for a in self.accounts if a.account_name != account.account_name]
         self.accounts.append(account)
-        self.save()
-    
+        self.save(self.encryption_key)
+
     def remove_account(self, account_name: str):
         """Remove account from manifest"""
         self.accounts = [a for a in self.accounts if a.account_name != account_name]
-        self.save()
+        self.save(self.encryption_key)
     
     def get_account(self, account_name: str) -> Optional[SteamGuardAccount]:
         """Get account by name"""
