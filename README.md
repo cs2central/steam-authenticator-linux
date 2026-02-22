@@ -174,7 +174,7 @@ Access via **Menu → Preferences → Appearance**
 
 | Data | Location |
 |------|----------|
-| Account Files | `./src/maFiles/` (git clone) or `~/.local/share/steam-authenticator/maFiles/` (Flatpak/system) |
+| Account Files | `./src/maFiles/` (git clone) or `~/.local/share/steam-authenticator/maFiles/` (system) |
 | Preferences | `~/.config/steam-authenticator/preferences.json` |
 | Logs | `~/.local/share/steam-authenticator/steam_authenticator.log` |
 

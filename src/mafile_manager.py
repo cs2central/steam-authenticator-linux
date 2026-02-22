@@ -16,13 +16,13 @@ class MaFileManager:
             default_dir = src_dir / "maFiles"
             try:
                 default_dir.mkdir(parents=True, exist_ok=True)
-                # Verify we can actually write here (read-only in Flatpak)
+                # Verify we can actually write here (may be read-only)
                 test_file = default_dir / ".write_test"
                 test_file.touch()
                 test_file.unlink()
                 self.mafiles_dir = default_dir
             except (PermissionError, OSError):
-                # Fall back to XDG data directory (Flatpak, system installs)
+                # Fall back to XDG data directory (system installs)
                 self.mafiles_dir = Path.home() / ".local" / "share" / "steam-authenticator" / "maFiles"
                 self.mafiles_dir.mkdir(parents=True, exist_ok=True)
         else:
