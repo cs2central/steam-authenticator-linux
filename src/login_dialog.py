@@ -210,7 +210,7 @@ class LoginDialog(Adw.Window):
                         # Create auto 2FA callback
                         async def auto_2fa_callback():
                             code = current_account.generate_steam_guard_code()
-                            logging.info(f"🤖 Auto-generated Steam Guard code: {code}")
+                            logging.info("Auto-generated Steam Guard code for login")
                             return code
                         
                         return await steam_login.complete_login_flow(username, password, auto_2fa_callback)

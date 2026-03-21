@@ -18,7 +18,6 @@ from cryptography.hazmat.primitives import hashes
 
 
 import os
-import secrets as _secrets
 
 SDA_PBKDF2_ITERATIONS = 50000
 SDA_KEY_SIZE = 32  # 256 bits

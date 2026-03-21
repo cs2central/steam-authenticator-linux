@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import logging
@@ -83,7 +84,12 @@ class MaFileManager:
         if filename is None:
             # Use Steam ID format (like Windows Steam Desktop Authenticator)
             if account.steamid:
-                filename = f"{account.steamid}.maFile"
+                # Validate steamid is purely numeric to prevent path traversal
+                if re.match(r'^\d+$', str(account.steamid)):
+                    filename = f"{account.steamid}.maFile"
+                else:
+                    safe_name = self._sanitize_filename(str(account.steamid))
+                    filename = f"{safe_name}.maFile"
             else:
                 # Fallback to account name if no Steam ID
                 safe_name = self._sanitize_filename(account.account_name or "unknown")
@@ -94,7 +100,8 @@ class MaFileManager:
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(account.to_dict(), f, indent=2)
-            
+            os.chmod(file_path, 0o600)
+
             account.mafile_path = file_path
             logging.info(f"Saved account to {file_path}")
             return file_path

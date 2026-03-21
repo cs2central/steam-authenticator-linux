@@ -47,7 +47,7 @@ class SteamProtobufLogin:
             if access_token:
                 params['access_token'] = access_token
             
-            async with self.session.get(url, params=params, headers=headers) as response:
+            async with self.session.get(url, params=params, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status == 200:
                     # Check for Steam-specific error headers
                     x_eresult = response.headers.get('x-eresult')
@@ -70,7 +70,7 @@ class SteamProtobufLogin:
             if access_token:
                 form_data.add_field('access_token', access_token)
             
-            async with self.session.post(url, data=form_data, headers=headers) as response:
+            async with self.session.post(url, data=form_data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status == 200:
                     # Check for Steam-specific error headers
                     x_eresult = response.headers.get('x-eresult')

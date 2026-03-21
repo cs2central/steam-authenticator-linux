@@ -48,10 +48,7 @@ install_system_deps() {
             ;;
         arch|manjaro|cachyos|endeavouros|garuda)
             echo -e "${GREEN}Installing dependencies for Arch-based system...${NC}"
-            echo -e "${YELLOW}Updating package database...${NC}"
-            sudo pacman -Sy
-            echo -e "${YELLOW}Installing packages...${NC}"
-            sudo pacman -S --noconfirm --needed gtk4 libadwaita python python-gobject python-pip
+            sudo pacman -S --needed --noconfirm gtk4 libadwaita python python-gobject python-pip
             ;;
         fedora|rhel|centos|rocky|alma)
             echo -e "${GREEN}Installing dependencies for Fedora/RHEL-based system...${NC}"
@@ -63,7 +60,7 @@ install_system_deps() {
             ;;
         gentoo)
             echo -e "${GREEN}Installing dependencies for Gentoo...${NC}"
-            sudo emerge --ask gui-libs/gtk gui-libs/libadwaita dev-python/pygobject
+            sudo emerge gui-libs/gtk gui-libs/libadwaita dev-python/pygobject
             ;;
         void)
             echo -e "${GREEN}Installing dependencies for Void Linux...${NC}"
@@ -85,10 +82,7 @@ install_system_deps() {
                     ;;
                 *arch*)
                     echo -e "${GREEN}Installing dependencies for Arch-like system...${NC}"
-                    echo -e "${YELLOW}Updating package database...${NC}"
-                    sudo pacman -Sy
-                    echo -e "${YELLOW}Installing packages...${NC}"
-                    sudo pacman -S --noconfirm --needed gtk4 libadwaita python python-gobject python-pip
+                    sudo pacman -S --needed --noconfirm gtk4 libadwaita python python-gobject python-pip
                     ;;
                 *fedora*|*rhel*)
                     echo -e "${GREEN}Installing dependencies for Fedora-like system...${NC}"
@@ -122,7 +116,7 @@ install_python_deps() {
 
     echo -e "${GREEN}Installing Python dependencies...${NC}"
     ./venv/bin/pip install --upgrade pip
-    ./venv/bin/pip install aiohttp cryptography "qrcode[pil]" Pillow requests argon2-cffi
+    ./venv/bin/pip install -r requirements.txt
 }
 
 # Install application icon

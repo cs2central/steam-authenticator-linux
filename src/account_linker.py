@@ -242,14 +242,12 @@ class AccountLinker:
         pos = 0
 
         while pos < len(data):
-            if pos >= len(data):
+            # Read field tag as varint (supports multi-byte tags for field numbers > 15)
+            tag, pos = self._decode_varint(data, pos)
+            if tag == 0:
                 break
-
-            # Read field tag
-            tag_byte = data[pos]
-            field_num = tag_byte >> 3
-            wire_type = tag_byte & 0x07
-            pos += 1
+            field_num = tag >> 3
+            wire_type = tag & 0x07
 
             if wire_type == 0:  # Varint
                 value, pos = self._decode_varint(data, pos)
@@ -259,6 +257,8 @@ class AccountLinker:
                     result["server_time"] = value
                 elif field_num == 12:
                     result["confirm_type"] = value
+            elif wire_type == 1:  # Fixed64
+                pos += 8
             elif wire_type == 2:  # Length-delimited
                 length, pos = self._decode_varint(data, pos)
                 value = data[pos:pos+length]
@@ -280,9 +280,11 @@ class AccountLinker:
                     result["phone_number_hint"] = value.decode('utf-8')
                 elif field_num == 8:
                     result["uri"] = value.decode('utf-8')
+            elif wire_type == 5:  # Fixed32
+                pos += 4
             else:
                 # Skip unknown wire types
-                break
+                continue
 
         return result
 
@@ -367,7 +369,7 @@ class AccountLinker:
         }
 
         try:
-            async with self.session.post(url, data=form_data, headers=headers) as response:
+            async with self.session.post(url, data=form_data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status == 200:
                     return await response.read()
                 else:
@@ -400,6 +402,8 @@ async def link_account(username: str, password: str, sms_callback) -> Dict[str, 
             return {"error": "login_failed", "message": "Could not login to Steam"}
 
         access_token = login_result.get("access_token")
+        if not access_token:
+            return {"error": "token_error", "message": "No access token received"}
         # Extract steamid from JWT
         import json
         token_parts = access_token.split('.')

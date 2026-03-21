@@ -1,7 +1,7 @@
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib, Gio
+from gi.repository import Gtk, Adw, GLib
 import asyncio
 import threading
 import logging
@@ -213,23 +213,60 @@ class ExpandableConfirmationRow(Gtk.ListBoxRow):
         error_label.add_css_class("dim-label")
         self.details_box.append(error_label)
     
+    def _get_confirmations_dialog(self):
+        """Walk up the widget tree to find the ConfirmationsDialog parent"""
+        parent = self.get_parent()
+        while parent and not isinstance(parent, ConfirmationsDialog):
+            parent = parent.get_parent()
+        return parent
+
     def on_accept_clicked(self, button):
-        """Handle accept button click"""
-        parent = self.get_parent()
-        while parent and not isinstance(parent, ConfirmationsDialog):
-            parent = parent.get_parent()
-        
-        if parent:
-            parent.respond_to_confirmation(self.confirmation, True)
-    
+        """Handle accept button click with confirmation dialog"""
+        parent = self._get_confirmations_dialog()
+        if not parent:
+            return
+
+        title = self.confirmation.get("title", "this trade")
+        dialog = Adw.MessageDialog(
+            transient_for=parent,
+            heading="Accept Confirmation",
+            body=f"Are you sure you want to accept \"{title}\"?",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("accept", "Accept")
+        dialog.set_response_appearance("accept", Adw.ResponseAppearance.SUGGESTED)
+        dialog.connect("response", self._on_accept_response)
+        dialog.present()
+
+    def _on_accept_response(self, dialog, response):
+        if response == "accept":
+            parent = self._get_confirmations_dialog()
+            if parent:
+                parent.respond_to_confirmation(self.confirmation, True)
+
     def on_deny_clicked(self, button):
-        """Handle deny button click"""
-        parent = self.get_parent()
-        while parent and not isinstance(parent, ConfirmationsDialog):
-            parent = parent.get_parent()
-        
-        if parent:
-            parent.respond_to_confirmation(self.confirmation, False)
+        """Handle deny button click with confirmation dialog"""
+        parent = self._get_confirmations_dialog()
+        if not parent:
+            return
+
+        title = self.confirmation.get("title", "this trade")
+        dialog = Adw.MessageDialog(
+            transient_for=parent,
+            heading="Deny Confirmation",
+            body=f"Are you sure you want to deny \"{title}\"?",
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("deny", "Deny")
+        dialog.set_response_appearance("deny", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", self._on_deny_response)
+        dialog.present()
+
+    def _on_deny_response(self, dialog, response):
+        if response == "deny":
+            parent = self._get_confirmations_dialog()
+            if parent:
+                parent.respond_to_confirmation(self.confirmation, False)
 
 
 class ConfirmationsDialog(Adw.Window):

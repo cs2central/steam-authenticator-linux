@@ -2,7 +2,7 @@
 import gi
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, GLib, Gio, Gdk, GdkPixbuf
+from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 import asyncio
 import threading
 from pathlib import Path
@@ -11,11 +11,11 @@ from pathlib import Path
 ICON_PATH = Path(__file__).parent / "icons"
 import json
 import logging
+from logging.handlers import RotatingFileHandler
 import time
 from datetime import datetime
 
-from steam_guard import SteamGuardAccount, Manifest
-from steam_api import SteamAPI
+from steam_guard import SteamGuardAccount
 from ui import MainWindow
 from mafile_manager import MaFileManager
 from login_dialog import LoginDialog
@@ -31,7 +31,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(_log_dir / 'steam_authenticator.log')
+        RotatingFileHandler(_log_dir / 'steam_authenticator.log', maxBytes=5*1024*1024, backupCount=3)
     ]
 )
 logger = logging.getLogger(__name__)
@@ -208,7 +208,7 @@ class SteamAuthenticatorApp(Adw.Application):
             dialog = Adw.MessageDialog(
                 transient_for=self.main_window,
                 heading="Remove Account",
-                body=f"Are you sure you want to remove {self.current_account.account_name}?",
+                body=f"Are you sure you want to remove {self.current_account.account_name}?\n\nThis will permanently delete the authenticator secrets for this account. Make sure you have backed up your account or saved your revocation code before removing.",
             )
             dialog.add_response("cancel", "Cancel")
             dialog.add_response("remove", "Remove")
@@ -850,10 +850,11 @@ class SteamAuthenticatorApp(Adw.Application):
                     refresh_token = account.session_data.get("refresh_token")
                     if refresh_token:
                         logging.info(f"Attempting to refresh token for {account.account_name}")
-                        async with SteamLogin() as steam_login:
-                            new_token = await steam_login.try_refresh_token(
-                                account.steamid, 
-                                refresh_token
+                        from steam_protobuf_login import SteamProtobufLogin
+                        async with SteamProtobufLogin() as steam_login:
+                            new_token = await steam_login.refresh_access_token(
+                                refresh_token,
+                                int(account.steamid)
                             )
                             if new_token:
                                 account.session_data["access_token"] = new_token

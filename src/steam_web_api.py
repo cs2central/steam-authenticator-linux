@@ -50,7 +50,7 @@ class SteamWebAPI:
             request_params.update(params)
 
         try:
-            async with self.session.get(url, params=request_params) as response:
+            async with self.session.get(url, params=request_params, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status == 403:
                     logging.error("Invalid Steam API key")
                     return None

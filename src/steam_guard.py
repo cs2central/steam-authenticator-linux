@@ -3,6 +3,8 @@ import hashlib
 import hmac
 import json
 import logging
+import os
+import tempfile
 import time
 from typing import Optional, Dict, Any
 from pathlib import Path
@@ -162,33 +164,37 @@ class SteamGuardAccount:
         """Generate a Steam Guard code for the given timestamp"""
         if not self.shared_secret:
             return ""
-        
-        if timestamp is None:
-            timestamp = int(time.time())
-        
-        # Steam uses 30-second intervals
-        time_bytes = (timestamp // 30).to_bytes(8, byteorder='big')
-        
-        # Decode the shared secret from base64
-        secret = base64.b64decode(self.shared_secret)
-        
-        # Generate HMAC
-        hmac_obj = hmac.new(secret, time_bytes, hashlib.sha1)
-        hash_bytes = hmac_obj.digest()
-        
-        # Get the offset from the last nibble
-        offset = hash_bytes[19] & 0xF
-        
-        # Get 4 bytes starting at the offset
-        code_int = int.from_bytes(hash_bytes[offset:offset + 4], byteorder='big') & 0x7FFFFFFF
-        
-        # Generate 5-character code using Steam's character set
-        code = ""
-        for _ in range(5):
-            code += self.STEAM_GUARD_CODE_CHARS[code_int % len(self.STEAM_GUARD_CODE_CHARS)]
-            code_int //= len(self.STEAM_GUARD_CODE_CHARS)
-        
-        return code
+
+        try:
+            if timestamp is None:
+                timestamp = int(time.time())
+
+            # Steam uses 30-second intervals
+            time_bytes = (timestamp // 30).to_bytes(8, byteorder='big')
+
+            # Decode the shared secret from base64
+            secret = base64.b64decode(self.shared_secret)
+
+            # Generate HMAC
+            hmac_obj = hmac.new(secret, time_bytes, hashlib.sha1)
+            hash_bytes = hmac_obj.digest()
+
+            # Get the offset from the last nibble
+            offset = hash_bytes[19] & 0xF
+
+            # Get 4 bytes starting at the offset
+            code_int = int.from_bytes(hash_bytes[offset:offset + 4], byteorder='big') & 0x7FFFFFFF
+
+            # Generate 5-character code using Steam's character set
+            code = ""
+            for _ in range(5):
+                code += self.STEAM_GUARD_CODE_CHARS[code_int % len(self.STEAM_GUARD_CODE_CHARS)]
+                code_int //= len(self.STEAM_GUARD_CODE_CHARS)
+
+            return code
+        except (ValueError, base64.binascii.Error, KeyError) as e:
+            logger.error(f"Error generating Steam Guard code: {e}")
+            return ""
     
     def get_time_until_next_code(self) -> int:
         """Get seconds until the next code"""
@@ -251,6 +257,7 @@ class Manifest:
     def __init__(self, manifest_path: Path):
         self.manifest_path = manifest_path
         self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        os.chmod(self.manifest_path.parent, 0o700)
         self.encryption_key = None
         self.accounts = []
         self.load()
@@ -401,8 +408,23 @@ class Manifest:
                 "accounts": [account.to_dict() for account in self.accounts]
             }
 
-        with open(self.manifest_path, 'w') as f:
-            json.dump(data, f, indent=2)
+        try:
+            # Atomic write: write to temp file first, then rename
+            dir_path = self.manifest_path.parent
+            fd, tmp_path = tempfile.mkstemp(dir=str(dir_path), suffix='.tmp')
+            try:
+                with os.fdopen(fd, 'w') as f:
+                    json.dump(data, f, indent=2)
+                os.chmod(tmp_path, 0o600)
+                os.rename(tmp_path, str(self.manifest_path))
+            except Exception:
+                # Clean up temp file on failure
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
+        except Exception as e:
+            logger.error(f"Error saving manifest: {e}")
+            raise
     
     def add_account(self, account: SteamGuardAccount):
         """Add account to manifest"""

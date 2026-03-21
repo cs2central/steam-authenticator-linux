@@ -5,16 +5,11 @@ description = "A modern Steam Authenticator for Linux with 2FA and trade confirm
 requires-python = ">=3.10"
 dependencies = [
     "PyGObject>=3.42.0",
-    "requests>=2.31.0",
     "cryptography>=41.0.0",
     "aiohttp>=3.9.0",
     "qrcode[pil]>=7.4.0",
     "Pillow>=10.0.0",
-    "argon2-cffi>=23.1.0",
 ]
-
-[project.scripts]
-steam-authenticator = "steam_authenticator.main:main"
 
 [build-system]
 requires = ["setuptools>=70.0", "wheel"]

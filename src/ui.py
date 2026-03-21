@@ -654,23 +654,20 @@ class AddAccountDialog(Adw.Window):
         
         # Instructions
         label = Gtk.Label()
-        label.set_markup("<b>Add Steam Account</b>\n\nYou can add an account by:\n• Scanning a QR code\n• Entering account details manually\n• Importing a .maFile")
+        label.set_markup("<b>Add Steam Account</b>\n\nYou can add an account by:\n• Entering account details manually\n• Importing a .maFile")
         label.set_wrap(True)
         content.append(label)
-        
+
         # Options
-        qr_button = Gtk.Button(label="Scan QR Code")
-        qr_button.add_css_class("suggested-action")
-        qr_button.connect("clicked", self.on_scan_qr)
-        content.append(qr_button)
-        
         manual_button = Gtk.Button(label="Enter Manually")
+        manual_button.add_css_class("suggested-action")
         manual_button.connect("clicked", self.on_enter_manually)
         content.append(manual_button)
-    
-    def on_scan_qr(self, button):
-        # TODO: Implement QR scanning
-        self.show_toast("QR scanning not yet implemented")
+
+        qr_button = Gtk.Button(label="Scan QR Code")
+        qr_button.set_sensitive(False)
+        qr_button.set_tooltip_text("Coming soon")
+        content.append(qr_button)
     
     def on_enter_manually(self, button):
         # Show manual entry dialog

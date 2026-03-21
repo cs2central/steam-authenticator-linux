@@ -1,5 +1,4 @@
 import aiohttp
-import asyncio
 import json
 import time
 import base64
@@ -7,7 +6,6 @@ import hashlib
 import hmac
 import re
 from typing import Optional, Dict, Any, List
-from urllib.parse import quote
 import logging
 
 logger = logging.getLogger(__name__)
@@ -48,8 +46,12 @@ class SteamAPI:
             logging.error(f"Error generating confirmation hash: {e}")
             return ""
     
-    async def get_confirmations(self, account) -> List[Dict[str, Any]]:
+    async def get_confirmations(self, account, _retry_count=0) -> List[Dict[str, Any]]:
         """Fetch trade confirmations using steamguard-cli approach"""
+        if _retry_count > 0:
+            logging.warning("Already retried get_confirmations, not retrying again")
+            return []
+
         if not account.identity_secret:
             logging.error("No identity secret available")
             return []
@@ -138,7 +140,8 @@ class SteamAPI:
                 f"{self.STEAM_API_BASE}/mobileconf/getlist",
                 params=params,
                 headers=headers,
-                cookies=cookies
+                cookies=cookies,
+                timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 if response.status == 200:
                     text = await response.text()
@@ -175,7 +178,7 @@ class SteamAPI:
                                             await manager.save_account(account)
                                             logging.info("Token refreshed, retrying confirmation fetch")
                                             # Retry the request with new token (but only once)
-                                            return await self.get_confirmations(account)
+                                            return await self.get_confirmations(account, _retry_count=_retry_count + 1)
                                 
                                 logging.error("Both tokens expired - need fresh login")
                                 return []
@@ -211,7 +214,7 @@ class SteamAPI:
                                 await manager.save_account(account)
                                 logging.info("Token refreshed, retrying confirmation fetch")
                                 # Retry the request with new token
-                                return await self.get_confirmations(account)
+                                return await self.get_confirmations(account, _retry_count=_retry_count + 1)
                     return []
                 else:
                     logging.error(f"Failed to fetch confirmations: {response.status}")
@@ -301,7 +304,7 @@ class SteamAPI:
                     "steamid": account.steamid
                 }
             
-            async with self.session.get(url, headers=headers, cookies=cookies) as response:
+            async with self.session.get(url, headers=headers, cookies=cookies, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status == 200:
                     html = await response.text()
                     return self._parse_trade_offer_html(html)
@@ -390,8 +393,12 @@ class SteamAPI:
         }
         return types.get(type_id, "Unknown")
     
-    async def respond_to_confirmation(self, account, confirmation_id: str, confirmation_key: str, accept: bool) -> bool:
+    async def respond_to_confirmation(self, account, confirmation_id: str, confirmation_key: str, accept: bool, _retry_count=0) -> bool:
         """Accept or deny a confirmation using steamguard-cli approach with automatic retry"""
+        if _retry_count > 0:
+            logging.warning("Already retried respond_to_confirmation, not retrying again")
+            return False
+
         try:
             time_stamp = int(time.time())
             operation = "allow" if accept else "cancel"
@@ -434,7 +441,8 @@ class SteamAPI:
                 f"{self.STEAM_API_BASE}/mobileconf/ajaxop",
                 params=params,
                 headers=headers,
-                cookies=cookies
+                cookies=cookies,
+                timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 if response.status == 200:
                     result = await response.json()
@@ -444,11 +452,11 @@ class SteamAPI:
                     if not success and result.get("needauth"):
                         logging.warning("Authentication required - attempting token refresh")
                         if account.session_data.get("refresh_token"):
-                            from steam_login import SteamLogin
-                            async with SteamLogin() as steam_login:
-                                new_token = await steam_login.try_refresh_token(
-                                    account.steamid,
-                                    account.session_data["refresh_token"]
+                            from steam_protobuf_login import SteamProtobufLogin
+                            async with SteamProtobufLogin() as steam_login:
+                                new_token = await steam_login.refresh_access_token(
+                                    account.session_data["refresh_token"],
+                                    int(account.steamid)
                                 )
                                 if new_token:
                                     account.session_data["access_token"] = new_token
@@ -459,21 +467,21 @@ class SteamAPI:
                                     await manager.save_account(account)
                                     logging.info("Token refreshed, retrying confirmation response")
                                     # Retry the request with new token
-                                    return await self.respond_to_confirmation(account, confirmation_id, confirmation_key, accept)
-                        
+                                    return await self.respond_to_confirmation(account, confirmation_id, confirmation_key, accept, _retry_count=_retry_count + 1)
+
                         logging.error("Session expired and token refresh failed")
                         return False
-                    
+
                     logging.info(f"Confirmation response result: {result}")
                     return success
                 elif response.status == 401:
                     logging.error("Unauthorized - attempting token refresh")
                     if account.session_data.get("refresh_token"):
-                        from steam_login import SteamLogin
-                        async with SteamLogin() as steam_login:
-                            new_token = await steam_login.try_refresh_token(
-                                account.steamid,
-                                account.session_data["refresh_token"]
+                        from steam_protobuf_login import SteamProtobufLogin
+                        async with SteamProtobufLogin() as steam_login:
+                            new_token = await steam_login.refresh_access_token(
+                                account.session_data["refresh_token"],
+                                int(account.steamid)
                             )
                             if new_token:
                                 account.session_data["access_token"] = new_token
@@ -484,7 +492,7 @@ class SteamAPI:
                                 await manager.save_account(account)
                                 logging.info("Token refreshed, retrying confirmation response")
                                 # Retry the request with new token
-                                return await self.respond_to_confirmation(account, confirmation_id, confirmation_key, accept)
+                                return await self.respond_to_confirmation(account, confirmation_id, confirmation_key, accept, _retry_count=_retry_count + 1)
                     return False
                 else:
                     logging.error(f"Failed to respond to confirmation: {response.status}")
@@ -568,7 +576,8 @@ class SteamAPI:
                 f"{self.STEAM_API_BASE}/mobileconf/getlist",
                 params=params,
                 headers=headers,
-                cookies=cookies
+                cookies=cookies,
+                timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 if response.status == 200:
                     text = await response.text()
@@ -598,33 +607,6 @@ class SteamAPI:
                 "needs_fresh_tokens": False
             }
     
-    async def refresh_session(self, account) -> bool:
-        """Refresh the session token"""
-        if not account.session_data.get("refresh_token"):
-            return False
-        
-        try:
-            data = {
-                "refresh_token": account.session_data["refresh_token"],
-                "steamid": account.steamid
-            }
-            
-            async with self.session.post(
-                f"{self.STEAM_LOGIN_BASE}/jwt/refresh",
-                json=data
-            ) as response:
-                if response.status == 200:
-                    result = await response.json()
-                    if result.get("success"):
-                        account.session_data["access_token"] = result["access_token"]
-                        if "refresh_token" in result:
-                            account.session_data["refresh_token"] = result["refresh_token"]
-                        return True
-            return False
-        except Exception as e:
-            logger.error(f"Error refreshing session: {e}")
-            return False
-    
     async def respond_to_multiple_confirmations(self, account, confirmation_ids: List[str], 
                                                confirmation_keys: List[str], accept: bool) -> bool:
         """Accept or deny multiple confirmations at once"""
@@ -649,21 +631,28 @@ class SteamAPI:
                 data[f"cid[{i}]"] = cid
                 data[f"ck[{i}]"] = ck
             
+            # Build cookies
+            cookies = {}
             if account.session_data.get("access_token"):
-                headers = {
-                    "Authorization": f"Bearer {account.session_data['access_token']}",
-                    "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36"
+                steam_login_secure = f"{account.steamid}||{account.session_data['access_token']}"
+                cookies = {
+                    "dob": "",
+                    "steamid": account.steamid,
+                    "steamLoginSecure": steam_login_secure
                 }
-            else:
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36",
-                    "Cookie": f"steamLoginSecure={account.session_data.get('steamLoginSecure', '')}"
-                }
-            
+
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36",
+                "Accept": "*/*",
+                "Referer": "https://steamcommunity.com/mobileconf/conf",
+            }
+
             async with self.session.post(
                 f"{self.STEAM_API_BASE}/mobileconf/multiajaxop",
                 data=data,
-                headers=headers
+                headers=headers,
+                cookies=cookies,
+                timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 if response.status == 200:
                     result = await response.json()

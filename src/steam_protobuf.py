@@ -5,7 +5,7 @@ Based on steamguard-cli's working implementation
 import base64
 import struct
 import io
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, Union
 
 
 class ProtobufWriter:
