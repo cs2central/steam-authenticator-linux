@@ -52,12 +52,8 @@ python3 -m venv --system-site-packages venv && ./venv/bin/pip install -r require
 ## Screenshots
 
 <p align="center">
-  <img src="assets/light-theme.webp" alt="Light Theme" width="300">
   <img src="assets/nord-theme.webp" alt="Nord Theme" width="300">
-</p>
-
-<p align="center">
-  <img src="assets/trade-confirmations.webp" alt="Trade Confirmations" width="500">
+  <img src="assets/trade-confirmations.webp" alt="Trade Confirmations" width="400">
 </p>
 
 8 themes available: Light, Dark, Crimson, Ocean, Forest, Purple, Sunset, Nord. Change in **Menu > Preferences > Appearance**.
