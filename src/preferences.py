@@ -3,8 +3,11 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, Gio, GObject
 import json
+import logging
 import os
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class PreferencesManager:
@@ -44,7 +47,7 @@ class PreferencesManager:
             with open(self.config_file, 'w') as f:
                 json.dump(self.settings, f, indent=2)
         except Exception as e:
-            print(f"Failed to save preferences: {e}")
+            logger.error(f"Failed to save preferences: {e}")
     
     def get(self, key, default=None):
         """Get a preference value"""
@@ -335,5 +338,5 @@ class PreferencesWindow(Adw.PreferencesWindow):
 
     def on_get_api_key_clicked(self, row):
         """Open Steam API key registration page"""
-        import subprocess
-        subprocess.Popen(["xdg-open", "https://steamcommunity.com/dev/apikey"])
+        import webbrowser
+        webbrowser.open("https://steamcommunity.com/dev/apikey")

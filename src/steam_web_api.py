@@ -222,7 +222,7 @@ class SteamWebAPI:
                 {"steamids": "76561197960265728"}  # Valve's Steam ID
             )
             return data is not None
-        except:
+        except (Exception):
             return False
 
 

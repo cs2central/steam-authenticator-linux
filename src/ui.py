@@ -10,6 +10,8 @@ from io import BytesIO
 from pathlib import Path
 import logging
 
+logger = logging.getLogger(__name__)
+
 from steam_guard import SteamGuardAccount
 from steam_api import SteamAPI
 from confirmations_dialog import ConfirmationsDialog
@@ -486,13 +488,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     def on_discord_clicked(self, button):
         """Open Discord invite link"""
-        import subprocess
-        subprocess.Popen(["xdg-open", "https://discord.gg/cs2central"])
+        import webbrowser
+        webbrowser.open("https://discord.gg/cs2central")
 
     def on_website_clicked(self, button):
         """Open website link"""
-        import subprocess
-        subprocess.Popen(["xdg-open", "https://cs2central.gg/"])
+        import webbrowser
+        webbrowser.open("https://cs2central.gg/")
     
     def update_code_font_size(self, font_size):
         """Update the font size of the Steam Guard code display"""

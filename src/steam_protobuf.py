@@ -116,7 +116,7 @@ class ProtobufReader:
                     # Try to decode as string
                     try:
                         value = value.decode('utf-8')
-                    except:
+                    except (UnicodeDecodeError, ValueError):
                         pass  # Keep as bytes
                 elif wire_type == 5:  # Fixed32
                     data = self.buffer.read(4)
@@ -129,7 +129,7 @@ class ProtobufReader:
                     continue
                 
                 self.fields[field_number] = value
-            except:
+            except (IndexError, struct.error, ValueError):
                 break
     
     def get_string(self, field_number: int) -> str:

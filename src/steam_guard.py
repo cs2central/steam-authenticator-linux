@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import time
 from typing import Optional, Dict, Any
 from pathlib import Path
@@ -10,6 +11,8 @@ from datetime import datetime
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+logger = logging.getLogger(__name__)
 
 
 class SteamGuardAccount:
@@ -126,7 +129,7 @@ class SteamGuardAccount:
                     payload += '=' * (4 - len(payload) % 4)
                     decoded = base64.b64decode(payload)
                     return json.loads(decoded)
-            except:
+            except (ValueError, KeyError, IndexError):
                 pass
             return None
         
@@ -362,7 +365,7 @@ class Manifest:
                     account = SteamGuardAccount(account_data)
                     self.accounts.append(account)
         except Exception as e:
-            print(f"Error loading manifest: {e}")
+            logger.error(f"Error loading manifest: {e}")
             self.accounts = []
 
     def save(self, password: Optional[str] = None):

@@ -10,6 +10,8 @@ from typing import Optional, Dict, Any, List
 from urllib.parse import quote
 import logging
 
+logger = logging.getLogger(__name__)
+
 
 class SteamAPI:
     STEAM_API_BASE = "https://steamcommunity.com"
@@ -503,7 +505,7 @@ class SteamAPI:
                 "message": "QR login not yet implemented"
             }
         except Exception as e:
-            print(f"Error in QR login: {e}")
+            logger.error(f"Error in QR login: {e}")
             return {"success": False, "message": str(e)}
     
     async def check_session_status(self, account) -> Dict[str, Any]:
@@ -620,7 +622,7 @@ class SteamAPI:
                         return True
             return False
         except Exception as e:
-            print(f"Error refreshing session: {e}")
+            logger.error(f"Error refreshing session: {e}")
             return False
     
     async def respond_to_multiple_confirmations(self, account, confirmation_ids: List[str], 
@@ -668,5 +670,5 @@ class SteamAPI:
                     return result.get("success", False)
                 return False
         except Exception as e:
-            print(f"Error responding to multiple confirmations: {e}")
+            logger.error(f"Error responding to multiple confirmations: {e}")
             return False

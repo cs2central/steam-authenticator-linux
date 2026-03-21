@@ -34,6 +34,7 @@ logging.basicConfig(
         logging.FileHandler(_log_dir / 'steam_authenticator.log')
     ]
 )
+logger = logging.getLogger(__name__)
 
 
 class SteamAuthenticatorApp(Adw.Application):
@@ -101,7 +102,7 @@ class SteamAuthenticatorApp(Adw.Application):
         """Load all accounts from maFiles directory"""
         # Show loading progress for large account collections
         mafiles_dir = self.mafile_manager.get_mafiles_directory()
-        print(f"Looking for .maFile files in: {mafiles_dir}")
+        logger.debug(f"Looking for .maFile files in: {mafiles_dir}")
         
         # Load accounts with progress indication
         self.accounts = self.mafile_manager.scan_mafiles()
@@ -109,21 +110,21 @@ class SteamAuthenticatorApp(Adw.Application):
         
         if account_count > 0:
             logging.info(f"Successfully loaded {account_count} accounts from maFiles")
-            print(f"✅ Loaded {account_count} Steam accounts")
-            
+            logger.info(f"Loaded {account_count} Steam accounts")
+
             # Log account names for debugging (first 10 only to avoid spam)
             if account_count <= 10:
                 for account in self.accounts:
-                    print(f"  • {account.account_name}")
+                    logger.debug(f"  • {account.account_name}")
             else:
                 for account in self.accounts[:5]:
-                    print(f"  • {account.account_name}")
-                print(f"  ... and {account_count - 5} more accounts")
+                    logger.debug(f"  • {account.account_name}")
+                logger.debug(f"  ... and {account_count - 5} more accounts")
         else:
-            print("No .maFile files found. You can:")
-            print("1. Copy your .maFile files to the maFiles directory")
-            print("2. Use 'Add Account' to create a new account")
-            print("3. Use 'Import Account' to import existing .maFile files")
+            logger.info("No .maFile files found. You can:")
+            logger.info("1. Copy your .maFile files to the maFiles directory")
+            logger.info("2. Use 'Add Account' to create a new account")
+            logger.info("3. Use 'Import Account' to import existing .maFile files")
     
     def create_action(self, name, callback, shortcuts=None):
         action = Gio.SimpleAction.new(name, None)

@@ -4,7 +4,10 @@ gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib, Gio
 import asyncio
 import threading
+import logging
 from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 from steam_guard import SteamGuardAccount
 from steam_api import SteamAPI
@@ -395,7 +398,7 @@ class ConfirmationsDialog(Adw.Window):
             try:
                 return loop.run_until_complete(fetch())
             except Exception as e:
-                print(f"Error fetching confirmations: {e}")
+                logger.error(f"Error fetching confirmations: {e}")
                 return None
             finally:
                 loop.close()
@@ -499,7 +502,7 @@ class ConfirmationsDialog(Adw.Window):
             try:
                 return loop.run_until_complete(respond())
             except Exception as e:
-                print(f"Error responding to confirmation: {e}")
+                logger.error(f"Error responding to confirmation: {e}")
                 return False
             finally:
                 loop.close()
@@ -544,7 +547,7 @@ class ConfirmationsDialog(Adw.Window):
             try:
                 return loop.run_until_complete(respond_all())
             except Exception as e:
-                print(f"Error responding to all confirmations: {e}")
+                logger.error(f"Error responding to all confirmations: {e}")
                 return False
             finally:
                 loop.close()

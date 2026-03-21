@@ -363,7 +363,7 @@ class SetupDialog(Adw.Window):
             token_parts = self.access_token.split('.')
             payload = json.loads(base64.b64decode(token_parts[1] + '=='))
             self.steamid = int(payload.get("sub", 0))
-        except:
+        except (ValueError, KeyError, IndexError):
             self.show_toast("Could not process login. Please try again.")
             self.stack.set_visible_child_name("login")
             return
