@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="50%" stop-color="#161b22"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </linearGradient>
+    <radialGradient id="glowLeft" cx="25%" cy="40%" r="40%">
+      <stop offset="0%" stop-color="rgba(56,132,244,0.12)"/>
+      <stop offset="100%" stop-color="rgba(56,132,244,0)"/>
+    </radialGradient>
+    <radialGradient id="glowRight" cx="75%" cy="50%" r="35%">
+      <stop offset="0%" stop-color="rgba(56,132,244,0.08)"/>
+      <stop offset="100%" stop-color="rgba(56,132,244,0)"/>
+    </radialGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="4" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bgGrad)"/>
+  <rect width="1280" height="640" fill="url(#glowLeft)"/>
+  <rect width="1280" height="640" fill="url(#glowRight)"/>
+
+  <!-- Noise -->
+  <g>
+    <filter id="noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" stitchTiles="stitch"/>
+    </filter>
+    <rect width="1280" height="640" filter="url(#noise)" opacity="0.015"/>
+  </g>
+
+  <!-- Frame -->
+  <rect x="32" y="32" width="1216" height="576" rx="16" fill="none" stroke="#21262d" stroke-width="1"/>
+
+  <!-- Left side: Text content -->
+  <g transform="translate(80, 120)">
+    <!-- App icon -->
+    <image href="icon.png" x="0" y="0" width="80" height="80" filter="url(#shadow)"/>
+
+    <!-- Title -->
+    <text x="96" y="35" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="700" font-size="32" fill="#e6edf3">Steam Authenticator</text>
+    <text x="96" y="68" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="700" font-size="32" fill="#3884f4">for Linux</text>
+
+    <!-- Description -->
+    <text x="0" y="130" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="400" font-size="18" fill="#8b949e">Steam Guard 2FA codes, trade confirmations,</text>
+    <text x="0" y="158" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="400" font-size="18" fill="#8b949e">and account management on your desktop.</text>
+
+    <!-- Feature pills -->
+    <g transform="translate(0, 200)">
+      <rect x="0" y="0" width="120" height="32" rx="16" fill="rgba(56,132,244,0.1)" stroke="rgba(56,132,244,0.3)" stroke-width="1"/>
+      <text x="60" y="21" text-anchor="middle" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="600" font-size="13" fill="#3884f4">2FA Codes</text>
+
+      <rect x="132" y="0" width="160" height="32" rx="16" fill="rgba(56,132,244,0.1)" stroke="rgba(56,132,244,0.3)" stroke-width="1"/>
+      <text x="212" y="21" text-anchor="middle" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="600" font-size="13" fill="#3884f4">Trade Confirms</text>
+
+      <rect x="304" y="0" width="130" height="32" rx="16" fill="rgba(56,132,244,0.1)" stroke="rgba(56,132,244,0.3)" stroke-width="1"/>
+      <text x="369" y="21" text-anchor="middle" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="600" font-size="13" fill="#3884f4">Multi-Account</text>
+    </g>
+
+    <!-- Linux + Open Source badges -->
+    <g transform="translate(0, 260)">
+      <rect x="0" y="0" width="90" height="28" rx="14" fill="rgba(87,242,135,0.1)" stroke="rgba(87,242,135,0.3)" stroke-width="1"/>
+      <text x="45" y="19" text-anchor="middle" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="600" font-size="11" fill="#57F287" letter-spacing="0.04em">LINUX</text>
+
+      <rect x="100" y="0" width="120" height="28" rx="14" fill="rgba(87,242,135,0.1)" stroke="rgba(87,242,135,0.3)" stroke-width="1"/>
+      <text x="160" y="19" text-anchor="middle" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="600" font-size="11" fill="#57F287" letter-spacing="0.04em">OPEN SOURCE</text>
+
+      <rect x="230" y="0" width="80" height="28" rx="14" fill="rgba(87,242,135,0.1)" stroke="rgba(87,242,135,0.3)" stroke-width="1"/>
+      <text x="270" y="19" text-anchor="middle" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="600" font-size="11" fill="#57F287" letter-spacing="0.04em">FREE</text>
+    </g>
+
+    <!-- By CS2 Central -->
+    <text x="0" y="340" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="500" font-size="14" fill="#484f58">by CS2 Central</text>
+    <text x="110" y="340" font-family="Segoe UI, Ubuntu, sans-serif" font-weight="500" font-size="14" fill="#3884f4">cs2central.gg</text>
+  </g>
+
+  <!-- Right side: App screenshots (overlapping, no shadow) -->
+  <g transform="translate(680, 60)">
+    <!-- Nord theme (behind, tilted) -->
+    <g transform="translate(40, 20) rotate(3)">
+      <rect x="-4" y="-4" width="288" height="428" rx="14" fill="#1a1f2b"/>
+      <image href="nord-theme.webp" width="280" height="420"/>
+    </g>
+    <!-- Light theme (in front, slightly tilted other way) -->
+    <g transform="translate(160, 50) rotate(-2)">
+      <rect x="-4" y="-4" width="288" height="428" rx="14" fill="#f0f0f0"/>
+      <image href="light-theme.webp" width="280" height="420"/>
+    </g>
+  </g>
+
+  <!-- CS2 Central logo bottom left with shadow -->
+  <g transform="translate(55, 510)" filter="url(#shadow)">
+    <image href="cs2central-logo.png" x="0" y="0" width="80" height="80"/>
+  </g>
+</svg>

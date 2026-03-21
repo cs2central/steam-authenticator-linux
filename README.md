@@ -9,14 +9,45 @@
   <a href="https://github.com/cs2central/steam-authenticator-linux/blob/main/LICENSE"><img src="https://img.shields.io/github/license/cs2central/steam-authenticator-linux" alt="License"></a>
 </p>
 
-<p align="center">
-  <a href="https://cs2central.gg/">Website</a> •
-  <a href="https://discord.gg/cs2central">Discord</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#features">Features</a>
-</p>
+Steam Guard 2FA codes, trade confirmations, and account management on your Linux desktop. No phone app needed.
 
 ---
+
+## Install
+
+```bash
+git clone https://github.com/cs2central/steam-authenticator-linux.git
+cd steam-authenticator-linux
+./install.sh
+```
+
+That's it. The install script handles dependencies for Debian/Ubuntu, Arch, Fedora, and openSUSE.
+
+<details>
+<summary>Manual install (if install.sh doesn't work for your distro)</summary>
+
+**Debian / Ubuntu / Linux Mint:**
+```bash
+sudo apt install gir1.2-gtk-4.0 gir1.2-adw-1 libgtk-4-1 libadwaita-1-0 python3-gi python3-gi-cairo python3-pip
+python3 -m venv --system-site-packages venv && ./venv/bin/pip install -r requirements.txt
+./run.sh
+```
+
+**Arch / CachyOS / Manjaro:**
+```bash
+sudo pacman -S gtk4 libadwaita python python-gobject python-pip
+python -m venv --system-site-packages venv && ./venv/bin/pip install -r requirements.txt
+./run.sh
+```
+
+**Fedora:**
+```bash
+sudo dnf install gtk4 libadwaita python3 python3-gobject python3-pip
+python3 -m venv --system-site-packages venv && ./venv/bin/pip install -r requirements.txt
+./run.sh
+```
+
+</details>
 
 ## Screenshots
 
@@ -25,210 +56,60 @@
   <img src="assets/nord-theme.webp" alt="Nord Theme" width="300">
 </p>
 
-## Features
+<p align="center">
+  <img src="assets/trade-confirmations.webp" alt="Trade Confirmations" width="500">
+</p>
 
-- **Set Up New Accounts** - Link Steam accounts directly from the app (no existing authenticator needed)
-- **2FA Code Generation** - Generate Steam Guard codes with live countdown timer
-- **Trade Confirmations** - View, accept, and deny trade confirmations
-- **Multiple Accounts** - Manage unlimited Steam accounts
-- **8 Beautiful Themes** - Light, Dark, Crimson, Ocean, Forest, Purple, Sunset, Nord
-- **Import/Export** - Import existing .maFile files or entire folders
-- **Backup & Restore** - Backup all accounts to a single file
-- **Steam Login** - Login directly to refresh session tokens
-- **Modern UI** - Built with GTK4 and libadwaita for native Linux experience
+8 themes available: Light, Dark, Crimson, Ocean, Forest, Purple, Sunset, Nord. Change in **Menu > Preferences > Appearance**.
 
-## Installation
+## Getting Started
 
-### Quick Install (Recommended)
+### New Steam account (no authenticator yet)
 
-```bash
-git clone https://github.com/cs2central/steam-authenticator-linux.git
-cd steam-authenticator-linux
-./install.sh
-```
-
-### Manual Installation
-
-<details>
-<summary><b>Debian / Ubuntu / Linux Mint</b></summary>
-
-```bash
-sudo apt install gir1.2-gtk-4.0 gir1.2-adw-1 libgtk-4-1 libadwaita-1-0 \
-    python3-gi python3-gi-cairo python3-pip
-
-git clone https://github.com/cs2central/steam-authenticator-linux.git
-cd steam-authenticator-linux
-python3 -m venv --system-site-packages venv
-./venv/bin/pip install -r requirements.txt
-
-./run.sh
-```
-
-</details>
-
-<details>
-<summary><b>Arch Linux / CachyOS / Manjaro</b></summary>
-
-```bash
-sudo pacman -S gtk4 libadwaita python python-gobject python-pip
-
-git clone https://github.com/cs2central/steam-authenticator-linux.git
-cd steam-authenticator-linux
-python -m venv --system-site-packages venv
-./venv/bin/pip install -r requirements.txt
-
-./run.sh
-```
-
-</details>
-
-<details>
-<summary><b>Fedora</b></summary>
-
-```bash
-sudo dnf install gtk4 libadwaita python3 python3-gobject python3-pip
-
-git clone https://github.com/cs2central/steam-authenticator-linux.git
-cd steam-authenticator-linux
-python3 -m venv --system-site-packages venv
-./venv/bin/pip install -r requirements.txt
-
-./run.sh
-```
-
-</details>
-
-<details>
-<summary><b>openSUSE</b></summary>
-
-```bash
-sudo zypper install gtk4 libadwaita-devel python3 python3-gobject python3-pip
-
-git clone https://github.com/cs2central/steam-authenticator-linux.git
-cd steam-authenticator-linux
-python3 -m venv --system-site-packages venv
-./venv/bin/pip install -r requirements.txt
-
-./run.sh
-```
-
-</details>
-
-
-## Usage
-
-### Setting Up a New Account
-
-If your Steam account does **not** have Steam Guard enabled yet:
-
-1. Menu → **Set Up New Account**
+1. Menu > **Set Up New Account**
 2. Enter your Steam username and password
-3. Steam will send a verification code to your phone (SMS) or email
-4. Enter the code to complete setup
-5. **Save your revocation code!** (needed to remove the authenticator later)
+3. Enter the verification code Steam sends to your phone/email
+4. **Save your revocation code** (you need this to remove the authenticator later)
 
-### Importing Existing Accounts
+### Already have a .maFile
 
-If you already have a `.maFile` from another authenticator:
+Menu > **Import Account** > select your `.maFile`. You can also import an entire folder of `.maFile` files.
 
-1. **Import Single File**: Menu → Import Account → Select your `.maFile`
-2. **Import Folder**: Menu → Import Folder → Select folder containing `.maFile` files
+### Trade confirmations
 
-Your `.maFile` should contain:
-```json
-{
-  "account_name": "your_steam_username",
-  "steamid": "76561198xxxxxxxxx",
-  "shared_secret": "base64_encoded_secret==",
-  "identity_secret": "base64_encoded_secret=="
-}
-```
+Click **View Confirmations** to see pending trades. Accept or deny individually, or use Accept All / Deny All.
 
-### Managing Confirmations
+### Backup
 
-1. Click on the account row to switch between accounts
-2. Click "View Confirmations" to see pending trade confirmations
-3. Accept or deny individual trades, or use "Accept All" / "Deny All"
-
-### Backup & Restore
-
-- **Backup**: Menu → Backup All Accounts → Save as .zip file
-- **Restore**: Menu → Restore from Backup → Select .zip file
-
-## Themes
-
-Access via **Menu → Preferences → Appearance**
-
-| Theme | Description |
-|-------|-------------|
-| Light | Clean bright interface |
-| Dark | Standard dark mode |
-| Crimson | Red neon aesthetic |
-| Ocean | Blue theme |
-| Forest | Green theme |
-| Purple | Violet theme |
-| Sunset | Orange theme |
-| Nord | Nordic color scheme |
-
-## File Locations
-
-| Data | Location |
-|------|----------|
-| Account Files | `./src/maFiles/` (git clone) or `~/.local/share/steam-authenticator/maFiles/` (system) |
-| Preferences | `~/.config/steam-authenticator/preferences.json` |
-| Logs | `~/.local/share/steam-authenticator/steam_authenticator.log` |
-
-## Uninstalling
-
-### Quick Install / Manual Install
-
-```bash
-# Remove desktop entry and icons
-rm -f ~/.local/share/applications/gg.cs2central.SteamAuthenticator.desktop
-rm -f ~/.local/share/icons/hicolor/256x256/apps/gg.cs2central.SteamAuthenticator.png
-rm -f ~/.local/share/icons/hicolor/scalable/apps/gg.cs2central.SteamAuthenticator.svg
-
-# Remove the cloned repository
-rm -rf /path/to/steam-authenticator-linux
-
-# Optionally remove config and data
-rm -rf ~/.config/steam-authenticator
-rm -rf ~/.local/share/steam-authenticator
-```
-
-## Building from Source
-
-```bash
-git clone https://github.com/cs2central/steam-authenticator-linux.git
-cd steam-authenticator-linux
-./install.sh
-```
+Menu > **Backup All Accounts** saves everything to a .zip. Restore with Menu > **Restore from Backup**.
 
 ## Security
 
-- Your `.maFile` data is stored locally only
-- No data is sent to external servers (except Steam's official API)
-- All authentication happens on your machine
-- Open source - verify the code yourself
-
-## License
-
-This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+- All data stored locally on your machine
+- No external servers (only Steam's official API)
+- Fully open source
 
 ## Support
 
-- **Discord**: [discord.gg/cs2central](https://discord.gg/cs2central)
-- **Website**: [cs2central.gg](https://cs2central.gg/)
-- **Issues**: [GitHub Issues](https://github.com/cs2central/steam-authenticator-linux/issues)
+- [Discord](https://discord.gg/cs2central)
+- [GitHub Issues](https://github.com/cs2central/steam-authenticator-linux/issues)
 
-## Credits
+## Uninstall
 
-- **zorex** - Lead Developer
-- [CS2Central](https://cs2central.gg/) - Community
-- Built with [GTK4](https://gtk.org/) and [libadwaita](https://gnome.pages.gitlab.gnome.org/libadwaita/)
+```bash
+rm -f ~/.local/share/applications/gg.cs2central.SteamAuthenticator.desktop
+rm -f ~/.local/share/icons/hicolor/256x256/apps/gg.cs2central.SteamAuthenticator.png
+rm -f ~/.local/share/icons/hicolor/scalable/apps/gg.cs2central.SteamAuthenticator.svg
+rm -rf /path/to/steam-authenticator-linux
+rm -rf ~/.config/steam-authenticator ~/.local/share/steam-authenticator
+```
+
+## License
+
+GPL-3.0 - see [LICENSE](LICENSE).
 
 ---
 
 <p align="center">
-  Made with ❤️ by zorex & <a href="https://cs2central.gg/">CS2Central</a>
+  Made by zorex & <a href="https://cs2central.gg/">CS2 Central</a>
 </p>
