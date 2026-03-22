@@ -56,7 +56,7 @@ python3 -m venv --system-site-packages venv && ./venv/bin/pip install -r require
   <img src="assets/trade-confirmations.webp" alt="Trade Confirmations" width="400">
 </p>
 
-8 themes available: Light, Dark, Crimson, Ocean, Forest, Purple, Sunset, Nord. Change in **Menu > Preferences > Appearance**.
+13 themes available: Light, Dark, Crimson, Ocean, Forest, Purple, Sunset, Nord, Neon, Sakura, Hacker, Bubblegum, Minimal. Change in **Menu > Preferences > Appearance**.
 
 ## Getting Started
 
@@ -64,8 +64,9 @@ python3 -m venv --system-site-packages venv && ./venv/bin/pip install -r require
 
 1. Menu > **Set Up New Account**
 2. Enter your Steam username and password
-3. Enter the verification code Steam sends to your phone/email
-4. **Save your revocation code** (you need this to remove the authenticator later)
+3. If you have email Steam Guard, enter the code sent to your email
+4. Enter the SMS verification code Steam sends to your phone
+5. **Save your revocation code** (you need this to remove the authenticator later)
 
 ### Already have a .maFile
 
@@ -81,8 +82,9 @@ Menu > **Backup All Accounts** saves everything to a .zip. Restore with Menu > *
 
 ## Security
 
-- All data stored locally on your machine
+- All data stored locally on your machine with restricted file permissions
 - No external servers (only Steam's official API)
+- Encrypted storage with AES-256-GCM
 - Fully open source
 
 ## Support
