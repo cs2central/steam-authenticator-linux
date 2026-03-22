@@ -8,6 +8,7 @@ import base64
 import uuid
 import time
 import logging
+import struct
 import hmac
 import hashlib
 from typing import Dict, Any, Optional
@@ -97,17 +98,16 @@ class AccountLinker:
             return {"error": "Not logged in"}
 
         try:
-            # Generate authenticator code from shared_secret
-            auth_code = self._generate_auth_code(shared_secret, server_time)
-
-            # Calculate time for request
-            auth_time = server_time // 30
-
-            # Build request
-            request_data = self._build_finalize_request(auth_code, auth_time, sms_code)
-
             # Try up to 30 times (Steam may request multiple codes)
             for attempt in range(30):
+                # Generate authenticator code for the current server_time
+                auth_code = self._generate_auth_code(shared_secret, server_time)
+
+                # Build request with absolute timestamp (not divided by 30)
+                request_data = self._build_finalize_request(auth_code, server_time, sms_code)
+
+                logging.debug(f"Finalize attempt {attempt+1}, server_time={server_time}, code={auth_code}")
+
                 response = await self._send_twofactor_request(
                     "FinalizeAddAuthenticator", 1, request_data
                 )
@@ -116,25 +116,25 @@ class AccountLinker:
                     return {"error": "No response from Steam"}
 
                 result = self._parse_finalize_response(response)
-
-                if result.get("status") != 1:
-                    if result.get("status") == 89:  # BadSMSCode
-                        return {"error": "bad_code", "message": "Invalid SMS/email code"}
-                    return {"error": "steam_error", "message": f"Steam error: {result.get('status')}"}
+                logging.debug(f"Finalize response: {result}")
 
                 if result.get("success"):
                     return {"success": True}
 
-                if result.get("want_more"):
-                    # Steam wants another code, update server_time and retry
-                    server_time = result.get("server_time", server_time + 30)
-                    auth_code = self._generate_auth_code(shared_secret, server_time)
-                    auth_time = server_time // 30
-                    request_data = self._build_finalize_request(auth_code, auth_time, sms_code)
-                    await asyncio.sleep(0.5)
-                    continue
+                status = result.get("status", 0)
+                if status == 89:  # BadSMSCode
+                    return {"error": "bad_code", "message": "Invalid SMS/email code"}
+                elif status != 0 and status != 1:
+                    return {"error": "steam_error", "message": f"Steam error: {status}"}
 
-                break
+                # Not yet successful, try with updated server_time
+                new_server_time = result.get("server_time", 0)
+                if new_server_time > 0:
+                    server_time = new_server_time
+                else:
+                    server_time += 30
+                await asyncio.sleep(0.5)
+                continue
 
             return {"error": "timeout", "message": "Too many attempts, please try again"}
 
@@ -187,27 +187,31 @@ class AccountLinker:
         return code
 
     def _build_add_authenticator_request(self) -> bytes:
-        """Build protobuf request for AddAuthenticator"""
-        # Simple protobuf encoding
+        """Build protobuf request for AddAuthenticator
+
+        Proto definition (CTwoFactor_AddAuthenticator_Request):
+            field 1: steamid (fixed64)
+            field 4: authenticator_type (uint32)
+            field 5: device_identifier (string)
+            field 8: version (uint32)
+        """
         data = b""
-        # Field 1: steamid (uint64)
-        data += b"\x08" + self._encode_varint(self.steamid)
-        # Field 2: authenticator_type = 1 (uint32)
-        data += b"\x10\x01"
-        # Field 3: device_identifier (string)
+        # Field 1: steamid (fixed64, wire type 1, tag = (1 << 3) | 1 = 0x09)
+        data += b"\x09" + struct.pack('<Q', self.steamid)
+        # Field 4: authenticator_type = 1 (uint32, wire type 0, tag = (4 << 3) | 0 = 0x20)
+        data += b"\x20\x01"
+        # Field 5: device_identifier (string, wire type 2, tag = (5 << 3) | 2 = 0x2a)
         device_bytes = self.device_id.encode('utf-8')
-        data += b"\x1a" + self._encode_varint(len(device_bytes)) + device_bytes
-        # Field 4: sms_phone_id = "1" (string)
-        data += b"\x22\x01\x31"
-        # Field 7: version = 2 (uint32)
-        data += b"\x38\x02"
+        data += b"\x2a" + self._encode_varint(len(device_bytes)) + device_bytes
+        # Field 8: version = 2 (uint32, wire type 0, tag = (8 << 3) | 0 = 0x40)
+        data += b"\x40\x02"
         return data
 
     def _build_finalize_request(self, auth_code: str, auth_time: int, sms_code: str) -> bytes:
         """Build protobuf request for FinalizeAddAuthenticator"""
         data = b""
-        # Field 1: steamid (uint64)
-        data += b"\x08" + self._encode_varint(self.steamid)
+        # Field 1: steamid (fixed64, wire type 1)
+        data += b"\x09" + struct.pack('<Q', self.steamid)
         # Field 2: authenticator_code (string)
         code_bytes = auth_code.encode('utf-8')
         data += b"\x12" + self._encode_varint(len(code_bytes)) + code_bytes
@@ -223,8 +227,8 @@ class AccountLinker:
     def _build_status_request(self) -> bytes:
         """Build protobuf request for QueryStatus"""
         data = b""
-        # Field 1: steamid (uint64)
-        data += b"\x08" + self._encode_varint(self.steamid)
+        # Field 1: steamid (fixed64, wire type 1)
+        data += b"\x09" + struct.pack('<Q', self.steamid)
         return data
 
     def _encode_varint(self, value: int) -> bytes:
@@ -238,11 +242,84 @@ class AccountLinker:
 
     def _parse_add_authenticator_response(self, data: bytes) -> Dict[str, Any]:
         """Parse AddAuthenticator response"""
+        """Parse based on CTwoFactor_AddAuthenticator_Response proto:
+            field 1: shared_secret (bytes)
+            field 2: serial_number (fixed64)
+            field 3: revocation_code (string)
+            field 4: uri (string)
+            field 5: server_time (uint64)
+            field 6: account_name (string)
+            field 7: token_gid (string)
+            field 8: identity_secret (bytes)
+            field 9: secret_1 (bytes)
+            field 10: status (int32)
+            field 11: phone_number_hint (string)
+            field 12: confirm_type (int32)
+        """
         result = {}
         pos = 0
 
         while pos < len(data):
-            # Read field tag as varint (supports multi-byte tags for field numbers > 15)
+            tag, pos = self._decode_varint(data, pos)
+            if tag == 0:
+                break
+            field_num = tag >> 3
+            wire_type = tag & 0x07
+
+            if wire_type == 0:  # Varint
+                value, pos = self._decode_varint(data, pos)
+                if field_num == 5:
+                    result["server_time"] = value
+                elif field_num == 10:
+                    result["status"] = value
+                elif field_num == 12:
+                    result["confirm_type"] = value
+            elif wire_type == 1:  # Fixed64
+                value = struct.unpack('<Q', data[pos:pos+8])[0]
+                pos += 8
+                if field_num == 2:
+                    result["serial_number"] = value
+            elif wire_type == 2:  # Length-delimited (bytes or string)
+                length, pos = self._decode_varint(data, pos)
+                value = data[pos:pos+length]
+                pos += length
+
+                if field_num == 1:
+                    result["shared_secret"] = base64.b64encode(value).decode('utf-8')
+                elif field_num == 3:
+                    result["revocation_code"] = value.decode('utf-8', errors='replace')
+                elif field_num == 4:
+                    result["uri"] = value.decode('utf-8', errors='replace')
+                elif field_num == 6:
+                    result["account_name"] = value.decode('utf-8', errors='replace')
+                elif field_num == 7:
+                    result["token_gid"] = value.decode('utf-8', errors='replace')
+                elif field_num == 8:
+                    result["identity_secret"] = base64.b64encode(value).decode('utf-8')
+                elif field_num == 11:
+                    result["phone_number_hint"] = value.decode('utf-8', errors='replace')
+            elif wire_type == 5:  # Fixed32
+                pos += 4
+            else:
+                continue
+
+        return result
+
+    def _parse_finalize_response(self, data: bytes) -> Dict[str, Any]:
+        """Parse FinalizeAddAuthenticator response
+
+        Proto definition (CTwoFactor_FinalizeAddAuthenticator_Response):
+            field 1: success (bool)
+            field 3: server_time (uint64)
+            field 4: status (int32)
+        """
+        result = {"success": False, "status": 0, "server_time": 0}
+        pos = 0
+
+        while pos < len(data):
+            if pos >= len(data):
+                break
+
             tag, pos = self._decode_varint(data, pos)
             if tag == 0:
                 break
@@ -252,68 +329,20 @@ class AccountLinker:
             if wire_type == 0:  # Varint
                 value, pos = self._decode_varint(data, pos)
                 if field_num == 1:
-                    result["status"] = value
-                elif field_num == 5:
+                    result["success"] = value == 1
+                elif field_num == 3:
                     result["server_time"] = value
-                elif field_num == 12:
-                    result["confirm_type"] = value
+                elif field_num == 4:
+                    result["status"] = value
+            elif wire_type == 2:  # Length-delimited (skip)
+                length, pos = self._decode_varint(data, pos)
+                pos += length
             elif wire_type == 1:  # Fixed64
                 pos += 8
-            elif wire_type == 2:  # Length-delimited
-                length, pos = self._decode_varint(data, pos)
-                value = data[pos:pos+length]
-                pos += length
-
-                if field_num == 2:
-                    result["shared_secret"] = base64.b64encode(value).decode('utf-8')
-                elif field_num == 3:
-                    result["serial_number"] = value.decode('utf-8')
-                elif field_num == 4:
-                    result["revocation_code"] = value.decode('utf-8')
-                elif field_num == 6:
-                    result["token_gid"] = value.decode('utf-8')
-                elif field_num == 7:
-                    result["identity_secret"] = base64.b64encode(value).decode('utf-8')
-                elif field_num == 9:
-                    result["account_name"] = value.decode('utf-8')
-                elif field_num == 11:
-                    result["phone_number_hint"] = value.decode('utf-8')
-                elif field_num == 8:
-                    result["uri"] = value.decode('utf-8')
             elif wire_type == 5:  # Fixed32
                 pos += 4
             else:
-                # Skip unknown wire types
                 continue
-
-        return result
-
-    def _parse_finalize_response(self, data: bytes) -> Dict[str, Any]:
-        """Parse FinalizeAddAuthenticator response"""
-        result = {}
-        pos = 0
-
-        while pos < len(data):
-            if pos >= len(data):
-                break
-
-            tag_byte = data[pos]
-            field_num = tag_byte >> 3
-            wire_type = tag_byte & 0x07
-            pos += 1
-
-            if wire_type == 0:  # Varint
-                value, pos = self._decode_varint(data, pos)
-                if field_num == 1:
-                    result["status"] = value
-                elif field_num == 2:
-                    result["server_time"] = value
-                elif field_num == 3:
-                    result["want_more"] = value == 1
-                elif field_num == 4:
-                    result["success"] = value == 1
-            else:
-                break
 
         return result
 
@@ -369,11 +398,13 @@ class AccountLinker:
         }
 
         try:
+            logging.debug(f"Sending {method} to {url}, protobuf hex: {data.hex()}")
             async with self.session.post(url, data=form_data, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
                 if response.status == 200:
                     return await response.read()
                 else:
-                    logging.error(f"Steam API error: {response.status}")
+                    body = await response.text()
+                    logging.error(f"Steam API error: {response.status}, body: {body[:500]}")
                     return None
         except Exception as e:
             logging.error(f"Request error: {e}")

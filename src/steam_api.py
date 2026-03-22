@@ -85,9 +85,9 @@ class SteamAPI:
                         from mafile_manager import MaFileManager
                         manager = MaFileManager()
                         await manager.save_account(account)
-                        logging.info("✅ Successfully refreshed and saved access token")
+                        logging.info("Successfully refreshed and saved access token")
                     else:
-                        logging.warning("⚠️ Token refresh failed - tokens may be permanently expired")
+                        logging.warning("Token refresh failed - tokens may be permanently expired")
         elif not token_status.get("refresh_token_valid", False):
             refresh_exp = token_status.get("refresh_token_expires")
             if refresh_exp:

@@ -147,7 +147,7 @@ class SteamAuthenticatorApp(Adw.Application):
             application_name='Steam Authenticator',
             application_icon='gg.cs2central.SteamAuthenticator',
             developer_name='zorex',
-            version='1.0.0',
+            version='1.1.0',
             developers=['zorex'],
             copyright='© 2026 zorex / CS2Central',
             license_type=Gtk.License.GPL_3_0,
@@ -903,12 +903,7 @@ class SteamAuthenticatorApp(Adw.Application):
             return
         
         # Show the Steam login dialog with protobuf support
-        dialog = LoginDialog(self.main_window)
-        
-        # Pre-fill username if available
-        if hasattr(dialog, 'username_entry') and self.current_account.account_name:
-            dialog.username_entry.set_text(self.current_account.account_name)
-        
+        dialog = LoginDialog(self.main_window, account=self.current_account)
         dialog.present()
         
         # Handle dialog response
@@ -1089,6 +1084,21 @@ class SteamAuthenticatorApp(Adw.Application):
         elif theme_name == "nord":
             style_manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
             self.apply_custom_theme(self.get_nord_css())
+        elif theme_name == "neon":
+            style_manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+            self.apply_custom_theme(self.get_neon_css())
+        elif theme_name == "sakura":
+            style_manager.set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
+            self.apply_custom_theme(self.get_sakura_css())
+        elif theme_name == "hacker":
+            style_manager.set_color_scheme(Adw.ColorScheme.FORCE_DARK)
+            self.apply_custom_theme(self.get_hacker_css())
+        elif theme_name == "bubblegum":
+            style_manager.set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
+            self.apply_custom_theme(self.get_bubblegum_css())
+        elif theme_name == "minimal":
+            style_manager.set_color_scheme(Adw.ColorScheme.FORCE_LIGHT)
+            self.apply_custom_theme(self.get_minimal_css())
     
     def clear_custom_theme(self):
         """Remove custom theme CSS"""
@@ -1123,8 +1133,8 @@ class SteamAuthenticatorApp(Adw.Application):
             @define-color headerbar_bg_color #242424;
 
             window { background-color: #1a1a1a; }
-            .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
-                color: #ff0040; text-shadow: 0 0 3px rgba(255, 0, 64, 0.5);
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #ff0040;
             }
             button.suggested-action {
                 background: linear-gradient(45deg, #cc0033, #ff0040);
@@ -1147,8 +1157,8 @@ class SteamAuthenticatorApp(Adw.Application):
             @define-color headerbar_bg_color #242424;
 
             window { background-color: #1a1a1a; }
-            .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
-                color: #00a8ff; text-shadow: 0 0 3px rgba(0, 168, 255, 0.5);
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #00a8ff;
             }
             button.suggested-action {
                 background: linear-gradient(45deg, #0077b6, #00a8ff);
@@ -1171,8 +1181,8 @@ class SteamAuthenticatorApp(Adw.Application):
             @define-color headerbar_bg_color #242424;
 
             window { background-color: #1a1a1a; }
-            .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
-                color: #00d26a; text-shadow: 0 0 3px rgba(0, 210, 106, 0.5);
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #00d26a;
             }
             button.suggested-action {
                 background: linear-gradient(45deg, #00a854, #00d26a);
@@ -1195,8 +1205,8 @@ class SteamAuthenticatorApp(Adw.Application):
             @define-color headerbar_bg_color #242424;
 
             window { background-color: #1a1a1a; }
-            .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
-                color: #a855f7; text-shadow: 0 0 3px rgba(168, 85, 247, 0.5);
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #a855f7;
             }
             button.suggested-action {
                 background: linear-gradient(45deg, #7c3aed, #a855f7);
@@ -1219,8 +1229,8 @@ class SteamAuthenticatorApp(Adw.Application):
             @define-color headerbar_bg_color #242424;
 
             window { background-color: #1a1a1a; }
-            .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
-                color: #ff6b35; text-shadow: 0 0 3px rgba(255, 107, 53, 0.5);
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #ff6b35;
             }
             button.suggested-action {
                 background: linear-gradient(45deg, #e65100, #ff6b35);
@@ -1243,8 +1253,8 @@ class SteamAuthenticatorApp(Adw.Application):
             @define-color headerbar_bg_color #3b4252;
 
             window { background-color: #2e3440; }
-            .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
-                color: #88c0d0; text-shadow: 0 0 3px rgba(136, 192, 208, 0.3);
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #88c0d0;
             }
             button.suggested-action {
                 background: linear-gradient(45deg, #5e81ac, #88c0d0);
@@ -1253,6 +1263,128 @@ class SteamAuthenticatorApp(Adw.Application):
             .card { background-color: #434c5e; border: 1px solid rgba(136, 192, 208, 0.15); }
             headerbar { background: linear-gradient(90deg, #2e3440, #3b4252); border-bottom: 1px solid rgba(136, 192, 208, 0.2); }
             .view, scrolledwindow > viewport { background-color: #3b4252; }
+        """
+
+
+    def get_neon_css(self):
+        """Neon - hot pink/cyan cyberpunk theme"""
+        return b"""
+            @define-color accent_color #ff2d95;
+            @define-color accent_bg_color #ff2d95;
+            @define-color accent_fg_color #ffffff;
+            @define-color window_bg_color #0a0a12;
+            @define-color view_bg_color #12121f;
+            @define-color card_bg_color #1a1a2e;
+            @define-color headerbar_bg_color #12121f;
+
+            window { background-color: #0a0a12; }
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #ff2d95;
+            }
+            button.suggested-action {
+                background: linear-gradient(45deg, #ff2d95, #00d4ff);
+                border: 1px solid #ff2d95;
+            }
+            .card { background-color: #1a1a2e; border: 1px solid rgba(255, 45, 149, 0.2); }
+            headerbar { background-color: #12121f; border-bottom: 1px solid rgba(255, 45, 149, 0.3); }
+            .view, scrolledwindow > viewport { background-color: #12121f; }
+        """
+
+    def get_sakura_css(self):
+        """Sakura - cherry blossom pink light theme"""
+        return b"""
+            @define-color accent_color #ec4899;
+            @define-color accent_bg_color #ec4899;
+            @define-color accent_fg_color #ffffff;
+            @define-color window_bg_color #fdf2f8;
+            @define-color view_bg_color #fce7f3;
+            @define-color card_bg_color #fbcfe8;
+            @define-color headerbar_bg_color #fce7f3;
+
+            window { background-color: #fdf2f8; }
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #db2777;
+            }
+            button.suggested-action {
+                background: linear-gradient(45deg, #ec4899, #f472b6);
+                border: 1px solid #ec4899;
+            }
+            .card { background-color: #fbcfe8; border: 1px solid rgba(236, 72, 153, 0.2); }
+            headerbar { background-color: #fce7f3; border-bottom: 1px solid rgba(236, 72, 153, 0.2); }
+            .view, scrolledwindow > viewport { background-color: #fce7f3; }
+        """
+
+    def get_hacker_css(self):
+        """Hacker - matrix green on black terminal style"""
+        return b"""
+            @define-color accent_color #00ff41;
+            @define-color accent_bg_color #00ff41;
+            @define-color accent_fg_color #000000;
+            @define-color window_bg_color #0d0d0d;
+            @define-color view_bg_color #111111;
+            @define-color card_bg_color #1a1a1a;
+            @define-color headerbar_bg_color #111111;
+
+            window { background-color: #0d0d0d; }
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #00ff41;
+            }
+            button.suggested-action {
+                background: #00ff41;
+                color: #000000;
+                border: 1px solid #00ff41;
+            }
+            .card { background-color: #1a1a1a; border: 1px solid rgba(0, 255, 65, 0.15); }
+            headerbar { background-color: #111111; border-bottom: 1px solid rgba(0, 255, 65, 0.2); }
+            .view, scrolledwindow > viewport { background-color: #111111; }
+        """
+
+    def get_bubblegum_css(self):
+        """Bubblegum - bright pastel purple/blue fun theme"""
+        return b"""
+            @define-color accent_color #8b5cf6;
+            @define-color accent_bg_color #8b5cf6;
+            @define-color accent_fg_color #ffffff;
+            @define-color window_bg_color #faf5ff;
+            @define-color view_bg_color #f3e8ff;
+            @define-color card_bg_color #e9d5ff;
+            @define-color headerbar_bg_color #f3e8ff;
+
+            window { background-color: #faf5ff; }
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #7c3aed;
+            }
+            button.suggested-action {
+                background: linear-gradient(45deg, #8b5cf6, #06b6d4);
+                border: 1px solid #8b5cf6;
+            }
+            .card { background-color: #e9d5ff; border: 1px solid rgba(139, 92, 246, 0.2); }
+            headerbar { background-color: #f3e8ff; border-bottom: 1px solid rgba(139, 92, 246, 0.2); }
+            .view, scrolledwindow > viewport { background-color: #f3e8ff; }
+        """
+
+    def get_minimal_css(self):
+        """Minimal - clean grayscale, no distractions"""
+        return b"""
+            @define-color accent_color #525252;
+            @define-color accent_bg_color #525252;
+            @define-color accent_fg_color #ffffff;
+            @define-color window_bg_color #fafafa;
+            @define-color view_bg_color #f5f5f5;
+            @define-color card_bg_color #e5e5e5;
+            @define-color headerbar_bg_color #f5f5f5;
+
+            window { background-color: #fafafa; }
+            .steam-code, .code-small, .code-medium, .code-large, .code-extra-large {
+                color: #171717;
+            }
+            button.suggested-action {
+                background: #171717;
+                border: 1px solid #171717;
+            }
+            .card { background-color: #e5e5e5; border: 1px solid #d4d4d4; }
+            headerbar { background-color: #f5f5f5; border-bottom: 1px solid #d4d4d4; }
+            .view, scrolledwindow > viewport { background-color: #f5f5f5; }
         """
 
 

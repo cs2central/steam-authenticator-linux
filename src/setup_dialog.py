@@ -35,10 +35,15 @@ class SetupDialog(Adw.Window):
 
         # State
         self.pending_data = None
-        self.sms_code_future = None
         self.linker = None
         self.access_token = None
+        self.refresh_token = None
         self.steamid = None
+        self.username = None
+
+        # For email/SMS guard code during login
+        self._guard_code_future = None
+        self._guard_code_loop = None
 
         self.setup_ui()
 
@@ -64,13 +69,16 @@ class SetupDialog(Adw.Window):
         # Step 1: Login
         self.stack.add_named(self.create_login_page(), "login")
 
-        # Step 2: SMS Code
+        # Step 2: Email/SMS Guard Code (during login)
+        self.stack.add_named(self.create_guard_code_page(), "guard_code")
+
+        # Step 3: SMS Code (after add_authenticator)
         self.stack.add_named(self.create_sms_page(), "sms")
 
-        # Step 3: Success
+        # Step 4: Success
         self.stack.add_named(self.create_success_page(), "success")
 
-        # Step 4: Loading
+        # Step 5: Loading
         self.stack.add_named(self.create_loading_page(), "loading")
 
     def create_login_page(self) -> Gtk.Widget:
@@ -87,7 +95,7 @@ class SetupDialog(Adw.Window):
         page.append(title)
 
         # Description
-        desc = Gtk.Label(label="Enter your Steam login credentials to set up the authenticator.\n\nYour account must NOT already have Steam Guard enabled.")
+        desc = Gtk.Label(label="Enter your Steam login credentials to set up the authenticator.")
         desc.set_wrap(True)
         desc.set_justify(Gtk.Justification.CENTER)
         desc.add_css_class("dim-label")
@@ -117,7 +125,6 @@ class SetupDialog(Adw.Window):
         self.error_label = Gtk.Label()
         self.error_label.set_wrap(True)
         self.error_label.set_justify(Gtk.Justification.CENTER)
-        # Apply red color via CSS
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b".error-text { color: #e01b24; font-weight: bold; }")
         self.error_label.get_style_context().add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
@@ -151,32 +158,76 @@ class SetupDialog(Adw.Window):
 
         return page
 
-    def create_sms_page(self) -> Gtk.Widget:
-        """Create the SMS verification step"""
+    def create_guard_code_page(self) -> Gtk.Widget:
+        """Create the Steam Guard email/SMS code page (used during login)"""
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
         page.set_margin_top(20)
         page.set_margin_bottom(20)
         page.set_margin_start(20)
         page.set_margin_end(20)
 
-        # Title
+        title = Gtk.Label(label="Steam Guard Code")
+        title.add_css_class("title-1")
+        page.append(title)
+
+        self.guard_desc = Gtk.Label(label="Steam has sent a verification code to your email.\nEnter it below to continue login.")
+        self.guard_desc.set_wrap(True)
+        self.guard_desc.set_justify(Gtk.Justification.CENTER)
+        self.guard_desc.add_css_class("dim-label")
+        page.append(self.guard_desc)
+
+        form_group = Adw.PreferencesGroup()
+        page.append(form_group)
+
+        self.guard_code_entry = Adw.EntryRow()
+        self.guard_code_entry.set_title("Steam Guard Code")
+        self.guard_code_entry.connect("entry-activated", self.on_guard_code_submit)
+        form_group.add(self.guard_code_entry)
+
+        # Spacer
+        spacer = Gtk.Box()
+        spacer.set_vexpand(True)
+        page.append(spacer)
+
+        # Buttons
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        button_box.set_halign(Gtk.Align.CENTER)
+
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", lambda b: self.close())
+        button_box.append(cancel_button)
+
+        submit_button = Gtk.Button(label="Submit")
+        submit_button.add_css_class("suggested-action")
+        submit_button.add_css_class("pill")
+        submit_button.connect("clicked", self.on_guard_code_submit)
+        button_box.append(submit_button)
+
+        page.append(button_box)
+        return page
+
+    def create_sms_page(self) -> Gtk.Widget:
+        """Create the SMS verification step (after add_authenticator)"""
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        page.set_margin_top(20)
+        page.set_margin_bottom(20)
+        page.set_margin_start(20)
+        page.set_margin_end(20)
+
         title = Gtk.Label(label="Enter Verification Code")
         title.add_css_class("title-1")
         page.append(title)
 
-        # Description
         self.sms_desc = Gtk.Label(label="Steam has sent a verification code to your phone.\nEnter it below to complete setup.")
         self.sms_desc.set_wrap(True)
         self.sms_desc.set_justify(Gtk.Justification.CENTER)
         self.sms_desc.add_css_class("dim-label")
         page.append(self.sms_desc)
 
-        # Phone hint
         self.phone_hint_label = Gtk.Label()
         self.phone_hint_label.add_css_class("dim-label")
         page.append(self.phone_hint_label)
 
-        # Code entry
         form_group = Adw.PreferencesGroup()
         page.append(form_group)
 
@@ -216,24 +267,20 @@ class SetupDialog(Adw.Window):
         page.set_margin_start(20)
         page.set_margin_end(20)
 
-        # Success icon
         icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
         icon.set_pixel_size(64)
         icon.add_css_class("success")
         page.append(icon)
 
-        # Title
         title = Gtk.Label(label="Setup Complete!")
         title.add_css_class("title-1")
         page.append(title)
 
-        # Description
         desc = Gtk.Label(label="Your Steam account is now linked.\nSave your revocation code in a safe place!")
         desc.set_wrap(True)
         desc.set_justify(Gtk.Justification.CENTER)
         page.append(desc)
 
-        # Revocation code box
         revoke_group = Adw.PreferencesGroup()
         revoke_group.set_title("Revocation Code")
         revoke_group.set_description("Use this code to remove the authenticator if you lose access")
@@ -251,7 +298,6 @@ class SetupDialog(Adw.Window):
 
         revoke_group.add(self.revocation_row)
 
-        # Warning
         warning_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         warning_box.set_margin_top(10)
         warning_icon = Gtk.Image.new_from_icon_name("dialog-warning-symbolic")
@@ -262,12 +308,10 @@ class SetupDialog(Adw.Window):
         warning_box.append(warning_label)
         page.append(warning_box)
 
-        # Spacer
         spacer = Gtk.Box()
         spacer.set_vexpand(True)
         page.append(spacer)
 
-        # Done button
         done_button = Gtk.Button(label="Done")
         done_button.add_css_class("suggested-action")
         done_button.add_css_class("pill")
@@ -296,9 +340,12 @@ class SetupDialog(Adw.Window):
 
         return page
 
+    # -----------------------------------------------------------------------
+    # Step 1: Login (with Steam Guard email/SMS code support)
+    # -----------------------------------------------------------------------
+
     def on_login_clicked(self, widget):
         """Handle login button click"""
-        # Hide any previous error
         self.hide_error()
 
         username = self.username_row.get_text().strip()
@@ -308,18 +355,33 @@ class SetupDialog(Adw.Window):
             self.show_error("Please enter username and password")
             return
 
+        self.username = username
         self.stack.set_visible_child_name("loading")
         self.loading_label.set_text("Logging in to Steam...")
 
-        # Start login in background thread
         def login_thread():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            self._guard_code_loop = loop
+
+            async def guard_code_callback(guard_type=2):
+                """Called by login flow when Steam Guard code is needed.
+                Shows the guard code UI and waits for user input.
+                guard_type: 2=email, 3=device code, 4=device confirmation"""
+                self._pending_guard_type = guard_type
+                future = loop.create_future()
+                self._guard_code_future = future
+                GLib.idle_add(self._show_guard_code_ui)
+                code = await future
+                return code
 
             async def do_login():
                 try:
                     async with SteamProtobufLogin() as login:
-                        result = await login.complete_login_flow(username, password)
+                        result = await login.complete_login_flow(
+                            username, password,
+                            auth_code_callback=guard_code_callback
+                        )
                         return result
                 except Exception as e:
                     logging.error(f"Login error: {e}")
@@ -327,21 +389,60 @@ class SetupDialog(Adw.Window):
 
             result = loop.run_until_complete(do_login())
             loop.close()
-            GLib.idle_add(self.handle_login_result, result, username)
+            self._guard_code_loop = None
+            GLib.idle_add(self.handle_login_result, result)
 
         thread = threading.Thread(target=login_thread)
         thread.daemon = True
         thread.start()
 
-    def handle_login_result(self, result, username):
-        """Handle login result"""
-        if result.get("error"):
-            self.show_error("Could not login. Please check your credentials.")
+    def _show_guard_code_ui(self):
+        """Show the Steam Guard code entry page (called from main thread)"""
+        guard_type = getattr(self, '_pending_guard_type', 2)
+
+        # Guard type 3 or 4 means account already has a mobile authenticator
+        if guard_type in (3, 4):
+            self.show_error("This account already has a mobile authenticator linked.\n\nTo add this account:\n1. Remove the existing authenticator in Steam settings\n2. Or use 'Import Account' if you have the .maFile")
             self.stack.set_visible_child_name("login")
+            if self._guard_code_future and self._guard_code_loop:
+                self._guard_code_loop.call_soon_threadsafe(
+                    self._guard_code_future.set_result, None
+                )
             return
 
-        if result.get("needs_2fa"):
-            self.show_error("This account already has Steam Guard enabled.\n\nTo use this account, you need to:\n1. Disable Steam Guard in your Steam account settings\n2. Or use 'Import Account' if you have the .maFile")
+        self.guard_desc.set_text("Steam has sent a verification code to your email.\nEnter it below to continue login.")
+        self.guard_code_entry.set_text("")
+        self.stack.set_visible_child_name("guard_code")
+        self.guard_code_entry.grab_focus()
+
+    def on_guard_code_submit(self, widget):
+        """User submitted the Steam Guard code"""
+        code = self.guard_code_entry.get_text().strip()
+        if not code:
+            self.show_toast("Please enter the Steam Guard code")
+            return
+
+        self.stack.set_visible_child_name("loading")
+        self.loading_label.set_text("Verifying Steam Guard code...")
+
+        # Resolve the future so the login flow continues
+        if self._guard_code_future and self._guard_code_loop:
+            self._guard_code_loop.call_soon_threadsafe(
+                self._guard_code_future.set_result, code
+            )
+
+    def handle_login_result(self, result):
+        """Handle login result - login is now fully complete"""
+        if result.get("error"):
+            error_msg = result.get("error", "")
+            # Don't overwrite an existing error (e.g. "already has authenticator")
+            if not self.error_box.get_visible():
+                if "RATE_LIMITED" in error_msg:
+                    self.show_error("Too many login attempts. Please wait a few minutes and try again.")
+                elif "Steam Guard" in error_msg:
+                    self.show_error("Invalid Steam Guard code. Please try again.")
+                else:
+                    self.show_error("Could not login. Please check your credentials.")
             self.stack.set_visible_child_name("login")
             return
 
@@ -350,27 +451,31 @@ class SetupDialog(Adw.Window):
             self.stack.set_visible_child_name("login")
             return
 
-        # Clear any previous error
         self.hide_error()
 
         # Store tokens
         self.access_token = result.get("access_token")
         self.refresh_token = result.get("refresh_token")
-        self.username = username
 
         # Extract steamid from JWT
         try:
+            if not self.access_token:
+                raise ValueError("No access token")
             token_parts = self.access_token.split('.')
             payload = json.loads(base64.b64decode(token_parts[1] + '=='))
             self.steamid = int(payload.get("sub", 0))
         except (ValueError, KeyError, IndexError):
-            self.show_toast("Could not process login. Please try again.")
+            self.show_error("Could not process login. Please try again.")
             self.stack.set_visible_child_name("login")
             return
 
-        # Now add authenticator
+        # Login complete, now try to add authenticator
         self.loading_label.set_text("Adding authenticator...")
         self.add_authenticator()
+
+    # -----------------------------------------------------------------------
+    # Step 2: Add authenticator
+    # -----------------------------------------------------------------------
 
     def add_authenticator(self):
         """Request to add authenticator"""
@@ -402,13 +507,13 @@ class SetupDialog(Adw.Window):
         if result.get("error"):
             error = result.get("error")
             if error == "authenticator_present":
-                self.show_error("This account already has Steam Guard enabled.\n\nTo use this account, you need to:\n1. Disable Steam Guard in your Steam account settings\n2. Or use 'Import Account' if you have the .maFile")
+                self.show_error("This account already has a mobile authenticator.\n\nTo use this account:\n1. Remove the existing authenticator in Steam settings\n2. Or use 'Import Account' if you have the .maFile")
             elif error == "no_phone":
                 self.show_error("Your Steam account needs a phone number.\n\nPlease add a phone number to your Steam account first, then try again.")
             elif error == "confirm_email":
                 self.show_error("Steam sent you a confirmation email.\n\nPlease click the link in that email, then try again.")
             else:
-                self.show_error("Could not add authenticator. Please try again.")
+                self.show_error(f"Could not add authenticator. Please try again.\n({error})")
 
             self.stack.set_visible_child_name("login")
             return
@@ -433,6 +538,10 @@ class SetupDialog(Adw.Window):
         self.sms_entry.set_text("")
         self.sms_entry.grab_focus()
 
+    # -----------------------------------------------------------------------
+    # Step 3: Finalize with SMS code
+    # -----------------------------------------------------------------------
+
     def on_sms_submit(self, widget):
         """Handle SMS code submission"""
         code = self.sms_entry.get_text().strip()
@@ -444,7 +553,6 @@ class SetupDialog(Adw.Window):
         self.stack.set_visible_child_name("loading")
         self.loading_label.set_text("Verifying code...")
 
-        # Finalize in background
         def finalize_thread():
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -460,7 +568,6 @@ class SetupDialog(Adw.Window):
                         result = await linker.finalize_authenticator(code, shared_secret, server_time)
 
                         if result.get("success"):
-                            # Verify status
                             status = await linker.query_status()
                             result["active"] = status.get("active", False)
 
@@ -513,11 +620,12 @@ class SetupDialog(Adw.Window):
             }
         }
 
-        # Emit signal with account data
         self.emit('account-created', account_data)
-
-        # Show success page
         self.stack.set_visible_child_name("success")
+
+    # -----------------------------------------------------------------------
+    # Helpers
+    # -----------------------------------------------------------------------
 
     def on_copy_revocation(self, button):
         """Copy revocation code to clipboard"""
@@ -527,17 +635,14 @@ class SetupDialog(Adw.Window):
         self.show_toast("Revocation code copied")
 
     def show_toast(self, message: str):
-        """Show a toast notification"""
         toast = Adw.Toast(title=message)
         toast.set_timeout(3)
         self.toast_overlay.add_toast(toast)
 
     def show_error(self, message: str):
-        """Show a persistent error message in red"""
         self.error_label.set_text(message)
         self.error_box.set_visible(True)
 
     def hide_error(self):
-        """Hide the error message"""
         self.error_box.set_visible(False)
         self.error_label.set_text("")

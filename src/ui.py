@@ -212,13 +212,13 @@ class MainWindow(Adw.ApplicationWindow):
         # Code label
         self.code_label = Gtk.Label()
         self.code_label.set_text("-----")
-        self.code_label.add_css_class("title-1")
+        self.code_label.add_css_class("steam-code")
         self.code_label.set_selectable(True)
         
         # Apply custom CSS for larger, monospace font
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b"""
-            .title-1 {
+            .steam-code {
                 font-size: 36px;
                 font-family: monospace;
                 font-weight: bold;
@@ -782,7 +782,9 @@ class AccountSelectorDialog(Adw.Window):
         
         self.setup_ui()
         self.populate_accounts()
-    
+        # Auto-focus search entry so user can type immediately
+        self.search_entry.grab_focus()
+
     def setup_ui(self):
         # Main box
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
@@ -978,8 +980,9 @@ class AccountSelectorDialog(Adw.Window):
         else:
             self.filtered_accounts = []
             for account in self.accounts:
-                # Search in account name and Steam ID
+                # Search in account name, display name, and Steam ID
                 if (search_text in account.account_name.lower() or
+                    (account.display_name and search_text in account.display_name.lower()) or
                     (account.steamid and search_text in str(account.steamid))):
                     self.filtered_accounts.append(account)
         

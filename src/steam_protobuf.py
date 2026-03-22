@@ -74,6 +74,7 @@ class ProtobufReader:
     def __init__(self, data: bytes):
         self.buffer = io.BytesIO(data)
         self.fields = {}
+        self.repeated_fields = {}  # For repeated (multi-value) fields
         self._parse()
     
     def read_varint(self) -> int:
@@ -129,6 +130,10 @@ class ProtobufReader:
                     continue
                 
                 self.fields[field_number] = value
+                # Also store in repeated_fields for multi-value support
+                if field_number not in self.repeated_fields:
+                    self.repeated_fields[field_number] = []
+                self.repeated_fields[field_number].append(value)
             except (IndexError, struct.error, ValueError):
                 break
     
@@ -146,6 +151,17 @@ class ProtobufReader:
         if isinstance(value, str):
             return value.encode('utf-8')
         return value
+
+    def get_all_bytes(self, field_number: int) -> list:
+        """Get all values for a repeated bytes/sub-message field"""
+        values = self.repeated_fields.get(field_number, [])
+        result = []
+        for v in values:
+            if isinstance(v, str):
+                result.append(v.encode('utf-8'))
+            elif isinstance(v, bytes):
+                result.append(v)
+        return result
 
 
 class SteamProtobufAuth:
@@ -181,13 +197,15 @@ class SteamProtobufAuth:
         writer.write_enum(12, 2)  # qos_level (2 = default priority)
         return writer.get_bytes()
     
-    def create_steamguard_request(self, client_id: int, steamid: int, code: str) -> bytes:
+    def create_steamguard_request(self, client_id: int, steamid: int, code: str, code_type: int = None) -> bytes:
         """Create UpdateAuthSessionWithSteamGuardCode request"""
+        if code_type is None:
+            code_type = self.GUARD_TYPE_DEVICE_CODE
         writer = ProtobufWriter()
         writer.write_uint64(1, client_id)  # client_id
         writer.write_fixed64(2, steamid)  # steamid - MUST be fixed64!
         writer.write_string(3, code)  # code
-        writer.write_enum(4, self.SESSION_GUARD_TYPE_DEVICE_CODE)  # code_type
+        writer.write_enum(4, code_type)  # code_type
         writer.write_bool(7, True)  # persistence (field 7)
         writer.write_enum(11, 0)  # language = 0 (English)
         writer.write_enum(12, 2)  # qos_level = 2 (default priority)
@@ -216,15 +234,45 @@ class SteamProtobufAuth:
             "timestamp": reader.get_uint64(3)
         }
     
+    # Steam Guard types from EAuthSessionGuardType
+    GUARD_TYPE_NONE = 1
+    GUARD_TYPE_EMAIL_CODE = 2
+    GUARD_TYPE_DEVICE_CODE = 3
+    GUARD_TYPE_DEVICE_CONFIRMATION = 4
+    GUARD_TYPE_EMAIL_CONFIRMATION = 5
+    GUARD_TYPE_MACHINE_TOKEN = 6
+
     def parse_auth_response(self, data: bytes) -> Dict[str, Any]:
         """Parse BeginAuthSessionViaCredentials response"""
         reader = ProtobufReader(data)
+
+        # Parse allowed_confirmations (field 4, repeated sub-message)
+        # Each sub-message has: confirmation_type (field 1), associated_message (field 2)
+        guard_types = []
+        raw_confirmations = reader.get_all_bytes(4)
+        for conf_data in raw_confirmations:
+            conf_reader = ProtobufReader(conf_data)
+            guard_type = conf_reader.get_uint64(1) or 0
+            message = conf_reader.get_string(2) or ""
+            guard_types.append({"type": guard_type, "message": message})
+
+        # Determine what kind of auth is needed
+        needs_email_code = any(g["type"] == self.GUARD_TYPE_EMAIL_CODE for g in guard_types)
+        needs_device_code = any(g["type"] == self.GUARD_TYPE_DEVICE_CODE for g in guard_types)
+        needs_device_confirm = any(g["type"] == self.GUARD_TYPE_DEVICE_CONFIRMATION for g in guard_types)
+        no_guard = any(g["type"] == self.GUARD_TYPE_NONE for g in guard_types) or len(guard_types) == 0
+
         return {
             "client_id": reader.get_uint64(1),
             "request_id": reader.get_bytes(2),
             "interval": reader.get_uint64(3),
-            "steamid": reader.get_uint64(5),  # steamid in response is uint64
-            "weak_token": reader.get_string(6)
+            "steamid": reader.get_uint64(5),
+            "weak_token": reader.get_string(6),
+            "guard_types": guard_types,
+            "needs_email_code": needs_email_code,
+            "needs_device_code": needs_device_code,
+            "needs_device_confirm": needs_device_confirm,
+            "no_guard": no_guard,
         }
     
     def parse_poll_response(self, data: bytes) -> Dict[str, Any]:

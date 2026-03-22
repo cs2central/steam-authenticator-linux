@@ -104,10 +104,15 @@ class PreferencesWindow(Adw.PreferencesWindow):
         theme_model.append("Purple")
         theme_model.append("Sunset")
         theme_model.append("Nord")
+        theme_model.append("Neon")
+        theme_model.append("Sakura")
+        theme_model.append("Hacker")
+        theme_model.append("Bubblegum")
+        theme_model.append("Minimal")
         theme_row.set_model(theme_model)
 
-        theme_map = {"light": 0, "dark": 1, "crimson": 2, "ocean": 3, "forest": 4, "purple": 5, "sunset": 6, "nord": 7}
-        reverse_theme_map = {0: "light", 1: "dark", 2: "crimson", 3: "ocean", 4: "forest", 5: "purple", 6: "sunset", 7: "nord"}
+        theme_map = {"light": 0, "dark": 1, "crimson": 2, "ocean": 3, "forest": 4, "purple": 5, "sunset": 6, "nord": 7, "neon": 8, "sakura": 9, "hacker": 10, "bubblegum": 11, "minimal": 12}
+        reverse_theme_map = {0: "light", 1: "dark", 2: "crimson", 3: "ocean", 4: "forest", 5: "purple", 6: "sunset", 7: "nord", 8: "neon", 9: "sakura", 10: "hacker", 11: "bubblegum", 12: "minimal"}
         theme_row.set_selected(theme_map.get(self.prefs.get("theme"), 0))
         theme_row.connect("notify::selected", lambda row, _: 
                          self.apply_theme_via_app(reverse_theme_map[row.get_selected()]))
@@ -229,7 +234,6 @@ class PreferencesWindow(Adw.PreferencesWindow):
             
             .title-1, .code-small, .code-medium, .code-large, .code-extra-large {
                 color: #ff0040;
-                text-shadow: 0 0 3px rgba(255, 0, 64, 0.5);
             }
             
             button.suggested-action {

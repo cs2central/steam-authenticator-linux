@@ -58,6 +58,8 @@ class SteamProtobufLogin:
                     
                     return await response.read()
                 else:
+                    if response.status == 429:
+                        raise Exception("RATE_LIMITED")
                     raise Exception(f"Steam API HTTP error: {response.status}")
         else:
             # For POST requests, use standard base64 and form data
@@ -81,8 +83,10 @@ class SteamProtobufLogin:
                     
                     return await response.read()
                 else:
+                    if response.status == 429:
+                        raise Exception("RATE_LIMITED")
                     raise Exception(f"Steam API HTTP error: {response.status}")
-    
+
     async def get_rsa_key(self, account_name: str) -> Dict[str, Any]:
         """Get RSA key for password encryption"""
         try:
@@ -100,7 +104,7 @@ class SteamProtobufLogin:
             result = self.protobuf.parse_rsa_response(response_data)
             
             if result["publickey_mod"] and result["publickey_exp"]:
-                logging.info("✅ Successfully got RSA key via protobuf")
+                logging.info("Successfully got RSA key via protobuf")
                 return {
                     "publickey_mod": result["publickey_mod"],
                     "publickey_exp": result["publickey_exp"],
@@ -158,12 +162,16 @@ class SteamProtobufLogin:
             result = self.protobuf.parse_auth_response(response_data)
             
             if result["client_id"]:
-                logging.info("✅ Successfully began auth session via protobuf")
+                logging.info("Successfully began auth session via protobuf")
+                logging.info(f"Guard types: {result.get('guard_types', [])}")
                 return {
                     "client_id": result["client_id"],
                     "request_id": result["request_id"],
                     "steamid": result["steamid"],
-                    "needs_2fa": True  # Assume we need 2FA
+                    "needs_email_code": result.get("needs_email_code", False),
+                    "needs_device_code": result.get("needs_device_code", False),
+                    "needs_device_confirm": result.get("needs_device_confirm", False),
+                    "no_guard": result.get("no_guard", False),
                 }
             else:
                 raise Exception("Invalid auth response")
@@ -172,20 +180,20 @@ class SteamProtobufLogin:
             logging.error(f"Error beginning auth session: {e}")
             return {"error": str(e)}
     
-    async def submit_steam_guard_code(self, client_id: int, steamid: int, code: str) -> bool:
+    async def submit_steam_guard_code(self, client_id: int, steamid: int, code: str, code_type: int = None) -> bool:
         """Submit Steam Guard code"""
         try:
-            logging.info(f"Submitting Steam Guard code")
-            
+            logging.info(f"Submitting Steam Guard code (type={code_type})")
+
             # Create protobuf request
-            request_data = self.protobuf.create_steamguard_request(client_id, steamid, code)
+            request_data = self.protobuf.create_steamguard_request(client_id, steamid, code, code_type)
             
             # Send request
             response_data = await self.send_protobuf_request(
                 "IAuthenticationService", "UpdateAuthSessionWithSteamGuardCode", 1, request_data
             )
             
-            logging.info("✅ Successfully submitted Steam Guard code")
+            logging.info("Successfully submitted Steam Guard code")
             return True
             
         except Exception as e:
@@ -207,7 +215,7 @@ class SteamProtobufLogin:
             result = self.protobuf.parse_poll_response(response_data)
             
             if result["access_token"] or result["refresh_token"]:
-                logging.info("✅ Successfully got tokens via protobuf polling")
+                logging.info("Successfully got tokens via protobuf polling")
                 return {
                     "success": True,
                     "access_token": result["access_token"],
@@ -240,7 +248,7 @@ class SteamProtobufLogin:
             result = self.protobuf.parse_refresh_response(response_data)
             
             if result["access_token"]:
-                logging.info("✅ Successfully refreshed access token via protobuf")
+                logging.info("Successfully refreshed access token via protobuf")
                 return result["access_token"]
             else:
                 raise Exception("No access token in response")
@@ -278,36 +286,40 @@ class SteamProtobufLogin:
             request_id = auth_response["request_id"]
             steamid = auth_response["steamid"]
             
-            # 4. Handle 2FA if needed
-            if auth_response.get("needs_2fa"):
+            # 4. Handle Steam Guard if needed
+            needs_email = auth_response.get("needs_email_code", False)
+            needs_device = auth_response.get("needs_device_code", False)
+            no_guard = auth_response.get("no_guard", False)
+
+            if needs_email or needs_device:
+                # Use correct guard type: 2 for email, 3 for device
+                guard_type = 2 if needs_email else 3
                 if auth_code_callback:
-                    auth_code = await auth_code_callback()
+                    auth_code = await auth_code_callback(guard_type)
                     if auth_code:
-                        success = await self.submit_steam_guard_code(client_id, steamid, auth_code)
+                        success = await self.submit_steam_guard_code(client_id, steamid, auth_code, code_type=guard_type)
                         if not success:
                             return {"error": "Failed to submit Steam Guard code"}
                     else:
-                        return {
-                            "needs_2fa": True,
-                            "client_id": client_id,
-                            "request_id": request_id,
-                            "steamid": steamid
-                        }
+                        return {"error": "Steam Guard code required but not provided"}
                 else:
-                    # No callback provided, return 2FA needed
                     return {
                         "needs_2fa": True,
+                        "needs_email_code": needs_email,
+                        "needs_device_code": needs_device,
                         "client_id": client_id,
                         "request_id": request_id,
                         "steamid": steamid
                     }
+            elif not no_guard:
+                logging.info("No guard required, proceeding to poll")
             
             # 5. Poll for tokens
             for attempt in range(30):  # Wait up to 30 seconds
                 result = await self.poll_auth_session(client_id, request_id)
                 
                 if result.get("success"):
-                    logging.info("🎉 Protobuf login successful!")
+                    logging.info("Protobuf login successful")
                     return result
                 elif result.get("waiting"):
                     await asyncio.sleep(1)

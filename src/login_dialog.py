@@ -25,8 +25,13 @@ class LoginDialog(Adw.Window):
         self.login_result = None
         self.pending_auth = None
         self.account = account
-        
+
         self.setup_ui()
+
+        # Prefill username and focus password
+        if self.account and self.account.account_name:
+            self.username_entry.set_text(self.account.account_name)
+            self.password_entry.grab_focus()
     
     def setup_ui(self):
         # Main box
@@ -64,7 +69,7 @@ class LoginDialog(Adw.Window):
         # Description (shorter and more concise)
         desc_label = Gtk.Label()
         desc_label.set_markup(
-            "🔐 <b>Generate Fresh Tokens</b>\n"
+            "<b>Generate Fresh Tokens</b>\n"
             "Creates new Steam session tokens for trade confirmations."
         )
         desc_label.set_wrap(True)
@@ -208,7 +213,7 @@ class LoginDialog(Adw.Window):
                         current_account.shared_secret):
                         
                         # Create auto 2FA callback
-                        async def auto_2fa_callback():
+                        async def auto_2fa_callback(guard_type=3):
                             code = current_account.generate_steam_guard_code()
                             logging.info("Auto-generated Steam Guard code for login")
                             return code
@@ -236,10 +241,12 @@ class LoginDialog(Adw.Window):
         if result.get("error"):
             error_msg = result['error']
             # Make error messages more user-friendly
-            if "invalid" in error_msg.lower() or "password" in error_msg.lower():
+            if "RATE_LIMITED" in error_msg:
+                self.show_toast("Rate limited. Wait a few minutes.", 5)
+            elif "invalid" in error_msg.lower() or "password" in error_msg.lower():
                 self.show_toast("Incorrect username or password")
             elif "rate" in error_msg.lower() or "limit" in error_msg.lower():
-                self.show_toast("Too many attempts. Please wait a moment.")
+                self.show_toast("Rate limited. Wait a moment.", 5)
             elif "network" in error_msg.lower() or "connection" in error_msg.lower():
                 self.show_toast("Connection error. Please check your internet.")
             else:
@@ -321,10 +328,10 @@ class LoginDialog(Adw.Window):
 
         return False
     
-    def show_toast(self, message: str):
+    def show_toast(self, message: str, timeout: int = 3):
         """Show a toast notification"""
         toast = Adw.Toast(title=message)
-        toast.set_timeout(3)
+        toast.set_timeout(timeout)
         self.toast_overlay.add_toast(toast)
     
     def get_login_result(self) -> Optional[Dict[str, Any]]:
